@@ -2,7 +2,7 @@
 
 This repository implements a practical v1 skeleton of a 4A portal with:
 
-- Backend: Go HTTP APIs (`/api/v1/*`) with Postgres-backed account authn and pluggable AuthZ/Audit
+- Backend: Go + Gin HTTP APIs (`/api/v1/*`) with Postgres-backed account authn and pluggable AuthZ/Audit
 - Frontend: Vite + React + TailwindCSS + shadcn-style UI primitives
 - Current providers: in-memory dev providers (replaceable with ZITADEL/OpenFGA adapters)
 
