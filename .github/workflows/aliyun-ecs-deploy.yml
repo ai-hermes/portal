@@ -23,7 +23,7 @@ jobs:
     env:
       ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
       ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
-      IMAGE_REPO: ${{ secrets.ALIYUN_ACR_REPOSITORY }}/backend
+      IMAGE_REPO: backend
 
     steps:
       - name: Checkout
@@ -37,7 +37,6 @@ jobs:
           set -euo pipefail
           test -n "${ACR_REGISTRY}" || (echo "ALIYUN_ACR_REGISTRY is required" && exit 1)
           test -n "${ACR_NAMESPACE}" || (echo "ALIYUN_ACR_NAMESPACE is required" && exit 1)
-          test -n "${IMAGE_REPO}" || (echo "ALIYUN_ACR_REPOSITORY is required, e.g. backend" && exit 1)
 
       - name: Compute image tag
         id: vars
