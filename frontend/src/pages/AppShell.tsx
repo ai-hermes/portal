@@ -12,7 +12,7 @@ export function AppShell() {
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col p-4">
       <header className="mb-4 rounded-xl border border-border bg-card p-4">
-        <h1 className="text-lg font-semibold">AI-Hermas 4A Console</h1>
+        <h1 className="text-lg font-semibold">AI-Hermes 4A Console</h1>
         <nav className="mt-3 flex gap-4 text-sm text-slate-700">
           <Link to="/app">Members</Link>
           <Link to="/app/policy">Policy</Link>

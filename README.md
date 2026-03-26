@@ -1,4 +1,4 @@
-# AI-Hermas Portal (4A v1 Skeleton)
+# AI-Hermes Portal (4A v1 Skeleton)
 
 This repository implements a practical v1 skeleton of a 4A portal with:
 
@@ -45,7 +45,7 @@ npm run build
 ### Build images
 
 ```bash
-docker build -f Dockerfile.backend -t ai-hermas-portal-backend:local .
+docker build -f Dockerfile.backend -t ai-hermes-portal-backend:local .
 ```
 
 The backend image now includes built frontend assets and serves both UI and API.
