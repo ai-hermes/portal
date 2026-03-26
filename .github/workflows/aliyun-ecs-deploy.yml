@@ -117,8 +117,30 @@ jobs:
 
       - name: Health check
         run: |
-          URL="${{ secrets.APP_HEALTHCHECK_URL }}"
-          if [ -z "$URL" ]; then URL="http://${{ secrets.ECS_HOST }}:8080/healthz"; fi
+          ADDR="${{ secrets.APP_HEALTHCHECK_ADDRESS }}"
+          URL=""
+
+          if [ -z "$ADDR" ]; then
+            URL="http://${{ secrets.ECS_HOST }}:8080/healthz"
+          elif [[ "$ADDR" == http://* || "$ADDR" == https://* ]]; then
+            URL="$ADDR"
+          else
+            if [[ "$ADDR" =~ :443($|/) ]]; then
+              SCHEME="https"
+            elif [[ "$ADDR" =~ :80($|/) ]]; then
+              SCHEME="http"
+            elif [[ "$ADDR" == *:* ]]; then
+              SCHEME="http"
+            else
+              SCHEME="https"
+            fi
+            URL="${SCHEME}://${ADDR}"
+          fi
+
+          if [[ "$URL" =~ ^https?://[^/]+$ ]]; then
+            URL="${URL}/healthz"
+          fi
+
           for i in $(seq 1 30); do
             if curl -fsS "$URL" >/dev/null; then
               echo "Health check passed: $URL"
