@@ -12,7 +12,7 @@ done
 echo "Creating OpenFGA store..."
 STORE_RES=$(curl -fsS -X POST "${API_URL}/stores" \
   -H 'content-type: application/json' \
-  -d '{"name":"ai-hermas-local"}')
+  -d '{"name":"ai-hermes-local"}')
 
 STORE_ID=$(echo "$STORE_RES" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
 if [ -z "$STORE_ID" ]; then

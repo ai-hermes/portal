@@ -31,7 +31,7 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-100 to-slate-50 p-4">
       <Card className="w-full max-w-md space-y-4">
-        <h1 className="text-xl font-semibold">AI-Hermas Portal Login</h1>
+        <h1 className="text-xl font-semibold">AI-Hermes Portal Login</h1>
         <p className="text-sm text-slate-600">OIDC bridge for tenant-scoped access.</p>
         <Input value={tenantID} onChange={(e) => setTenantID(e.currentTarget.value)} />
         {error && <p className="text-sm text-red-600">{error}</p>}
