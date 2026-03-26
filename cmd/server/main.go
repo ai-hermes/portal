@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -9,30 +11,48 @@ import (
 
 	"github.com/warjiang/portal/internal/api"
 	"github.com/warjiang/portal/internal/audit"
-	"github.com/warjiang/portal/internal/auth"
+	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
-	"github.com/warjiang/portal/internal/identity"
 	"github.com/warjiang/portal/internal/providers/auditmem"
 	"github.com/warjiang/portal/internal/providers/authzmem"
 	"github.com/warjiang/portal/internal/providers/authzopenfga"
-	"github.com/warjiang/portal/internal/providers/identitymem"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	identityProvider := identitymem.NewProvider()
+	db, err := sql.Open("postgres", envOr("DATABASE_URL", "postgres://openfga:openfga@localhost:5432/openfga?sslmode=disable"))
+	if err != nil {
+		log.Fatalf("open database failed: %v", err)
+	}
+	defer db.Close()
+	if err := db.Ping(); err != nil {
+		log.Fatalf("ping database failed: %v", err)
+	}
+	if err := authn.Migrate(context.Background(), db); err != nil {
+		log.Fatalf("run auth migrations failed: %v", err)
+	}
+
 	auditStore := auditmem.NewStore()
 	auditSvc := audit.NewService(auditStore)
 	authzProvider := selectAuthzProvider()
+	authnSvc, err := authn.NewService(db, authn.Config{
+		JWTSigningKey:    envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
+		AccessTokenTTL:   parseDurationOr("ACCESS_TOKEN_TTL", 15*time.Minute),
+		RefreshTokenTTL:  parseDurationOr("REFRESH_TOKEN_TTL", 30*24*time.Hour),
+		EmailCodeTTL:     parseDurationOr("EMAIL_CODE_TTL", 10*time.Minute),
+		PasswordResetTTL: parseDurationOr("PASSWORD_RESET_TTL", 15*time.Minute),
+	}, authn.NewLogEmailProvider(), auditSvc)
+	if err != nil {
+		log.Fatalf("create auth service failed: %v", err)
+	}
 
-	authSvc := auth.NewService(identityProvider)
-	identitySvc := identity.NewService(identityProvider)
 	authzSvc := authz.NewService(authzProvider)
 
 	router := api.NewRouter(api.Dependencies{
-		Auth:     authSvc,
-		Identity: identitySvc,
-		Authz:    authzSvc,
-		Audit:    auditSvc,
+		Authn: authnSvc,
+		Authz: authzSvc,
+		Audit: auditSvc,
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
 	handler := api.NewAppHandler(router, webDir)
@@ -62,6 +82,19 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func parseDurationOr(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("invalid duration for %s=%s, fallback=%s", key, raw, fallback)
+		return fallback
+	}
+	return parsed
 }
 
 func selectAuthzProvider() authz.Provider {

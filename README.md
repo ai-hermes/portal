@@ -2,7 +2,7 @@
 
 This repository implements a practical v1 skeleton of a 4A portal with:
 
-- Backend: Go HTTP APIs (`/api/v1/*`) with pluggable interfaces for IdP/AuthZ/Audit
+- Backend: Go HTTP APIs (`/api/v1/*`) with Postgres-backed account authn and pluggable AuthZ/Audit
 - Frontend: Vite + React + TailwindCSS + shadcn-style UI primitives
 - Current providers: in-memory dev providers (replaceable with ZITADEL/OpenFGA adapters)
 
@@ -15,13 +15,7 @@ go run ./cmd/server
 
 Server runs on `:8080` by default.
 
-### Demo token
-
-Current dev mode uses a token format:
-
-```text
-Bearer dev:tenant-acme:u-admin
-```
+Backend requires Postgres and `JWT_SIGNING_KEY`; schema is auto-migrated on startup.
 
 ## Frontend quick start
 
@@ -68,8 +62,14 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 
 ## v1 APIs
 
-- `POST /api/v1/auth/login/start`
-- `GET /api/v1/auth/callback`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/verify-email`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/password/change`
+- `POST /api/v1/auth/password/forgot`
+- `POST /api/v1/auth/password/reset`
 - `GET /api/v1/me`
 - `GET /api/v1/tenants/:id/members`
 - `POST /api/v1/permissions/check`
@@ -85,6 +85,12 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 ## Runtime environment variables
 
 - `PORT` default `:8080`
+- `DATABASE_URL` Postgres DSN for account data
+- `JWT_SIGNING_KEY` HMAC signing key for access token
+- `ACCESS_TOKEN_TTL` default `15m`
+- `REFRESH_TOKEN_TTL` default `720h`
+- `EMAIL_CODE_TTL` default `10m`
+- `PASSWORD_RESET_TTL` default `15m`
 - `AUTHZ_PROVIDER` default `memory` (`openfga` to enable OpenFGA provider)
 - `OPENFGA_API_URL` default `http://localhost:8081` for non-compose local runs
 - `OPENFGA_STORE_ID` required when `AUTHZ_PROVIDER=openfga`

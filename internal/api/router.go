@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/warjiang/portal/internal/audit"
-	"github.com/warjiang/portal/internal/auth"
+	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
 	"github.com/warjiang/portal/internal/identity"
 	"github.com/warjiang/portal/internal/models"
@@ -13,10 +13,9 @@ import (
 )
 
 type Dependencies struct {
-	Auth     *auth.Service
-	Identity *identity.Service
-	Authz    *authz.Service
-	Audit    *audit.Service
+	Authn *authn.Service
+	Authz *authz.Service
+	Audit *audit.Service
 }
 
 type Router struct {
@@ -28,8 +27,14 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", r.handleHealth)
-	mux.HandleFunc("/api/v1/auth/login/start", r.handleLoginStart)
-	mux.HandleFunc("/api/v1/auth/callback", r.handleAuthCallback)
+	mux.HandleFunc("/api/v1/auth/register", r.handleRegister)
+	mux.HandleFunc("/api/v1/auth/verify-email", r.handleVerifyEmail)
+	mux.HandleFunc("/api/v1/auth/login", r.handleLogin)
+	mux.HandleFunc("/api/v1/auth/refresh", r.handleRefresh)
+	mux.HandleFunc("/api/v1/auth/logout", r.handleLogout)
+	mux.HandleFunc("/api/v1/auth/password/change", r.withAuth(r.handleChangePassword))
+	mux.HandleFunc("/api/v1/auth/password/forgot", r.handleForgotPassword)
+	mux.HandleFunc("/api/v1/auth/password/reset", r.handleResetPassword)
 	mux.HandleFunc("/api/v1/me", r.withAuth(r.handleMe))
 	mux.HandleFunc("/api/v1/permissions/check", r.withAuth(r.handlePermissionCheck))
 	mux.HandleFunc("/api/v1/policies/relationships", r.withAuth(r.handleWriteRelationships))
@@ -43,44 +48,203 @@ func (r *Router) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	utils.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-type loginStartRequest struct {
-	TenantID    string `json:"tenant_id"`
-	RedirectURI string `json:"redirect_uri"`
+type registerRequest struct {
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
 }
 
-func (r *Router) handleLoginStart(w http.ResponseWriter, req *http.Request) {
+func (r *Router) handleRegister(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-
-	var body loginStartRequest
+	var body registerRequest
 	if err := utils.DecodeJSON(req, &body); err != nil {
 		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	authURL, state, err := r.deps.Auth.StartLogin(req.Context(), body.TenantID, body.RedirectURI)
+	result, err := r.deps.Authn.Register(req.Context(), authn.RegisterInput{
+		Email:       body.Email,
+		Password:    body.Password,
+		DisplayName: body.DisplayName,
+	}, req.RemoteAddr, req.UserAgent())
 	if err != nil {
-		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		r.writeAuthError(w, err)
 		return
 	}
-	utils.JSON(w, http.StatusOK, map[string]string{"auth_url": authURL, "state": state})
+	utils.JSON(w, http.StatusCreated, result)
 }
 
-func (r *Router) handleAuthCallback(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
+type verifyEmailRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+func (r *Router) handleVerifyEmail(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
 		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-
-	code := req.URL.Query().Get("code")
-	state := req.URL.Query().Get("state")
-	token, err := r.deps.Auth.HandleCallback(req.Context(), code, state)
-	if err != nil {
+	var body verifyEmailRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
 		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	utils.JSON(w, http.StatusOK, map[string]string{"access_token": token, "token_type": "Bearer"})
+	err := r.deps.Authn.VerifyEmail(req.Context(), authn.VerifyEmailInput{
+		Email: body.Email,
+		Code:  body.Code,
+	})
+	if err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]bool{"verified": true})
+}
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (r *Router) handleLogin(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body loginRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	pair, err := r.deps.Authn.Login(req.Context(), body.Email, body.Password, req.RemoteAddr, req.UserAgent())
+	if err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, pair)
+}
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+func (r *Router) handleRefresh(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body refreshRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	pair, err := r.deps.Authn.Refresh(req.Context(), body.RefreshToken, req.RemoteAddr, req.UserAgent())
+	if err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, pair)
+}
+
+func (r *Router) handleLogout(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body refreshRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := r.deps.Authn.Logout(req.Context(), body.RefreshToken); err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+func (r *Router) handleForgotPassword(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body forgotPasswordRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := r.deps.Authn.RequestPasswordReset(req.Context(), body.Email); err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type resetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+func (r *Router) handleResetPassword(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body resetPasswordRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := r.deps.Authn.ResetPassword(req.Context(), body.Token, body.NewPassword); err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+func (r *Router) handleChangePassword(w http.ResponseWriter, req *http.Request, principal identity.Principal) {
+	if req.Method != http.MethodPost {
+		utils.JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var body changePasswordRequest
+	if err := utils.DecodeJSON(req, &body); err != nil {
+		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := r.deps.Authn.ChangePassword(req.Context(), principal.UserID, body.OldPassword, body.NewPassword); err != nil {
+		r.writeAuthError(w, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (r *Router) writeAuthError(w http.ResponseWriter, err error) {
+	if ae, ok := authn.AsAPIError(err); ok {
+		utils.JSON(w, ae.Status, map[string]any{
+			"error": map[string]string{
+				"code":    ae.Code,
+				"message": ae.Message,
+			},
+		})
+		return
+	}
+	utils.JSON(w, http.StatusInternalServerError, map[string]any{
+		"error": map[string]string{
+			"code":    "internal_error",
+			"message": "internal server error",
+		},
+	})
 }
 
 func (r *Router) withAuth(next func(http.ResponseWriter, *http.Request, identity.Principal)) http.HandlerFunc {
@@ -90,9 +254,9 @@ func (r *Router) withAuth(next func(http.ResponseWriter, *http.Request, identity
 			utils.JSON(w, http.StatusUnauthorized, map[string]string{"error": "missing bearer token"})
 			return
 		}
-		principal, err := r.deps.Identity.ResolvePrincipal(req.Context(), token)
+		principal, err := r.deps.Authn.AuthenticateAccessToken(req.Context(), token)
 		if err != nil {
-			utils.JSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})
+			r.writeAuthError(w, err)
 			return
 		}
 		next(w, req, principal)
@@ -126,7 +290,7 @@ func (r *Router) handleTenantMembers(w http.ResponseWriter, req *http.Request, p
 		utils.JSON(w, http.StatusForbidden, map[string]string{"error": "cross-tenant access denied"})
 		return
 	}
-	members, err := r.deps.Identity.ListTenantMembers(req.Context(), tenantID)
+	members, err := r.deps.Authn.ListTenantMembers(req.Context(), tenantID)
 	if err != nil {
 		utils.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
