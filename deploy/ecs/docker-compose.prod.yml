@@ -1,0 +1,17 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: ai-hermas-portal-backend
+    restart: unless-stopped
+    environment:
+      PORT: ":8080"
+      AUTHZ_PROVIDER: "${AUTHZ_PROVIDER:-memory}"
+      OPENFGA_API_URL: "${OPENFGA_API_URL:-}"
+      OPENFGA_STORE_ID: "${OPENFGA_STORE_ID:-}"
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
