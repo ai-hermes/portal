@@ -125,13 +125,27 @@ export async function verifyEmail(email: string, code: string) {
   });
 }
 
-export async function login(email: string, password: string) {
+export async function login(account: string, password: string) {
   const pair = await apiFetch<TokenPair>(`${apiBaseURL}/api/v1/auth/login`, {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ account, password })
   });
   setSession(pair);
   return pair;
+}
+
+export async function sendRegisterSMSCode(phone: string) {
+  return apiFetch<{ ok: boolean }>(`${apiBaseURL}/api/v1/auth/sms/send-code`, {
+    method: "POST",
+    body: JSON.stringify({ phone, purpose: "register" })
+  });
+}
+
+export async function registerByPhone(input: { phone: string; code: string; password: string; display_name?: string }) {
+  return apiFetch<{ user_id: string; tenant_id: string }>(`${apiBaseURL}/api/v1/auth/register/phone`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export async function logout() {

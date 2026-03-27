@@ -9,14 +9,20 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
-			email TEXT NOT NULL UNIQUE,
+			email TEXT UNIQUE,
+			phone TEXT,
 			password_hash TEXT NOT NULL,
 			display_name TEXT NOT NULL DEFAULT '',
 			email_verified_at TIMESTAMPTZ,
+			phone_verified_at TIMESTAMPTZ,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at TIMESTAMPTZ NOT NULL,
 			updated_at TIMESTAMPTZ NOT NULL
 		)`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ`,
+		`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users (phone) WHERE phone IS NOT NULL`,
 		`CREATE TABLE IF NOT EXISTS tenants (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -53,6 +59,18 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 			created_at TIMESTAMPTZ NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_email_verifications_user_id ON email_verifications (user_id)`,
+		`CREATE TABLE IF NOT EXISTS sms_verifications (
+			id TEXT PRIMARY KEY,
+			phone TEXT NOT NULL,
+			purpose TEXT NOT NULL,
+			code_hash TEXT NOT NULL,
+			expires_at TIMESTAMPTZ NOT NULL,
+			used_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL,
+			request_ip TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sms_verifications_phone_purpose ON sms_verifications (phone, purpose, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_sms_verifications_request_ip ON sms_verifications (request_ip, purpose, created_at DESC)`,
 		`CREATE TABLE IF NOT EXISTS password_resets (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,

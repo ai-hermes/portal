@@ -38,6 +38,8 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	auth := engine.Group("/api/v1/auth")
 	auth.POST("/register", r.handleRegister)
+	auth.POST("/register/phone", r.handleRegisterByPhone)
+	auth.POST("/sms/send-code", r.handleSendSMSCode)
 	auth.POST("/verify-email", r.handleVerifyEmail)
 	auth.POST("/login", r.handleLogin)
 	auth.POST("/refresh", r.handleRefresh)
@@ -110,6 +112,7 @@ func (r *Router) handleVerifyEmail(c *gin.Context) {
 }
 
 type loginRequest struct {
+	Account  string `json:"account"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
@@ -121,12 +124,68 @@ func (r *Router) handleLogin(c *gin.Context) {
 		return
 	}
 
-	pair, err := r.deps.Authn.Login(c.Request.Context(), body.Email, body.Password, c.Request.RemoteAddr, c.Request.UserAgent())
+	account := strings.TrimSpace(body.Account)
+	if account == "" {
+		account = body.Email
+	}
+	pair, err := r.deps.Authn.Login(c.Request.Context(), account, body.Password, c.Request.RemoteAddr, c.Request.UserAgent())
 	if err != nil {
 		r.writeAuthError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, pair)
+}
+
+type sendSMSCodeRequest struct {
+	Phone   string `json:"phone"`
+	Purpose string `json:"purpose"`
+}
+
+func (r *Router) handleSendSMSCode(c *gin.Context) {
+	var body sendSMSCodeRequest
+	if err := decodeJSON(c, &body); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if body.Purpose == "" {
+		body.Purpose = "register"
+	}
+	if err := r.deps.Authn.SendSMSCode(c.Request.Context(), authn.SendSMSCodeInput{
+		Phone:   body.Phone,
+		Purpose: body.Purpose,
+	}, c.Request.RemoteAddr); err != nil {
+		r.writeAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]bool{"ok": true})
+}
+
+type registerByPhoneRequest struct {
+	Phone       string `json:"phone"`
+	Code        string `json:"code"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
+}
+
+func (r *Router) handleRegisterByPhone(c *gin.Context) {
+	var body registerByPhoneRequest
+	if err := decodeJSON(c, &body); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := r.deps.Authn.RegisterByPhone(c.Request.Context(), authn.RegisterPhoneInput{
+		Phone:       body.Phone,
+		Code:        body.Code,
+		Password:    body.Password,
+		DisplayName: body.DisplayName,
+	}, c.Request.RemoteAddr, c.Request.UserAgent())
+	if err != nil {
+		r.writeAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, result)
 }
 
 type refreshRequest struct {

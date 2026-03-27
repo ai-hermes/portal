@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/warjiang/portal/internal/api"
@@ -16,6 +17,7 @@ import (
 	"github.com/warjiang/portal/internal/providers/auditmem"
 	"github.com/warjiang/portal/internal/providers/authzmem"
 	"github.com/warjiang/portal/internal/providers/authzopenfga"
+	"github.com/warjiang/portal/internal/providers/smsaliyun"
 
 	_ "github.com/lib/pq"
 )
@@ -36,13 +38,19 @@ func main() {
 	auditStore := auditmem.NewStore()
 	auditSvc := audit.NewService(auditStore)
 	authzProvider := selectAuthzProvider()
+	smsProvider := selectSMSProvider()
 	authnSvc, err := authn.NewService(db, authn.Config{
-		JWTSigningKey:    envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
-		AccessTokenTTL:   parseDurationOr("ACCESS_TOKEN_TTL", 15*time.Minute),
-		RefreshTokenTTL:  parseDurationOr("REFRESH_TOKEN_TTL", 30*24*time.Hour),
-		EmailCodeTTL:     parseDurationOr("EMAIL_CODE_TTL", 10*time.Minute),
-		PasswordResetTTL: parseDurationOr("PASSWORD_RESET_TTL", 15*time.Minute),
-	}, authn.NewLogEmailProvider(), auditSvc)
+		JWTSigningKey:     envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
+		AccessTokenTTL:    parseDurationOr("ACCESS_TOKEN_TTL", 15*time.Minute),
+		RefreshTokenTTL:   parseDurationOr("REFRESH_TOKEN_TTL", 30*24*time.Hour),
+		EmailCodeTTL:      parseDurationOr("EMAIL_CODE_TTL", 10*time.Minute),
+		SMSCodeTTL:        parseDurationOr("SMS_CODE_TTL", 10*time.Minute),
+		SMSRateWindow:     parseDurationOr("SMS_RATE_WINDOW", 10*time.Minute),
+		SMSResendInterval: parseDurationOr("SMS_RESEND_INTERVAL", 60*time.Second),
+		SMSMaxPerPhone:    parseIntOr("SMS_MAX_PER_PHONE", 5),
+		SMSMaxPerIP:       parseIntOr("SMS_MAX_PER_IP", 20),
+		PasswordResetTTL:  parseDurationOr("PASSWORD_RESET_TTL", 15*time.Minute),
+	}, authn.NewLogEmailProvider(), smsProvider, auditSvc)
 	if err != nil {
 		log.Fatalf("create auth service failed: %v", err)
 	}
@@ -97,6 +105,19 @@ func parseDurationOr(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+func parseIntOr(key string, fallback int) int {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil {
+		log.Printf("invalid int for %s=%s, fallback=%d", key, raw, fallback)
+		return fallback
+	}
+	return parsed
+}
+
 func selectAuthzProvider() authz.Provider {
 	switch envOr("AUTHZ_PROVIDER", "memory") {
 	case "openfga":
@@ -111,5 +132,27 @@ func selectAuthzProvider() authz.Provider {
 	default:
 		log.Printf("using in-memory authz provider")
 		return authzmem.NewProvider()
+	}
+}
+
+func selectSMSProvider() authn.SMSProvider {
+	switch envOr("SMS_PROVIDER", "log") {
+	case "aliyun":
+		provider, err := smsaliyun.NewProvider(smsaliyun.Config{
+			RegionID:             envOr("ALIBABA_CLOUD_REGION_ID", "cn-hangzhou"),
+			AccessKeyID:          os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"),
+			AccessKeySecret:      os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
+			SignName:             os.Getenv("ALIYUN_SMS_SIGN_NAME"),
+			RegisterTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_REGISTER"),
+		})
+		if err != nil {
+			log.Printf("init aliyun sms provider failed: %v, fallback to log provider", err)
+			return authn.NewLogSMSProvider()
+		}
+		log.Printf("using aliyun sms provider")
+		return provider
+	default:
+		log.Printf("using log sms provider")
+		return authn.NewLogSMSProvider()
 	}
 }

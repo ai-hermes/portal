@@ -4,7 +4,7 @@ import { Button, Card, Input } from "../components/ui";
 import { login } from "../lib/api";
 
 export function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -14,7 +14,7 @@ export function LoginPage() {
     try {
       setLoading(true);
       setError("");
-      await login(email, password);
+      await login(account, password);
       navigate("/app");
     } catch (e) {
       setError((e as Error).message);
@@ -27,7 +27,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-100 to-slate-50 p-4">
       <Card className="w-full max-w-md space-y-4">
         <h1 className="text-xl font-semibold">AI-Hermes Portal Login</h1>
-        <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
+        <Input placeholder="Email or phone" value={account} onChange={(e) => setAccount(e.currentTarget.value)} />
         <Input
           placeholder="Password"
           type="password"

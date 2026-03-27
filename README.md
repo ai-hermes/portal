@@ -63,6 +63,8 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 ## v1 APIs
 
 - `POST /api/v1/auth/register`
+- `POST /api/v1/auth/register/phone`
+- `POST /api/v1/auth/sms/send-code`
 - `POST /api/v1/auth/verify-email`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
@@ -90,9 +92,22 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 - `ACCESS_TOKEN_TTL` default `15m`
 - `REFRESH_TOKEN_TTL` default `720h`
 - `EMAIL_CODE_TTL` default `10m`
+- `SMS_CODE_TTL` default `10m`
+- `SMS_RATE_WINDOW` default `10m`
+- `SMS_RESEND_INTERVAL` default `60s`
+- `SMS_MAX_PER_PHONE` default `5`
+- `SMS_MAX_PER_IP` default `20`
 - `PASSWORD_RESET_TTL` default `15m`
+- `SMS_PROVIDER` default `log` (`aliyun` to enable Alibaba Cloud SMS provider)
+- `ALIBABA_CLOUD_REGION_ID` default `cn-hangzhou`
+- `ALIBABA_CLOUD_ACCESS_KEY_ID` required when `SMS_PROVIDER=aliyun`
+- `ALIBABA_CLOUD_ACCESS_KEY_SECRET` required when `SMS_PROVIDER=aliyun`
+- `ALIYUN_SMS_SIGN_NAME` required when `SMS_PROVIDER=aliyun`
+- `ALIYUN_SMS_TEMPLATE_CODE_REGISTER` required when `SMS_PROVIDER=aliyun`
 - `AUTHZ_PROVIDER` default `memory` (`openfga` to enable OpenFGA provider)
 - `OPENFGA_API_URL` default `http://localhost:8081` for non-compose local runs
 - `OPENFGA_STORE_ID` required when `AUTHZ_PROVIDER=openfga`
 - `VITE_API_BASE_URL` optional frontend API prefix, default empty (same-origin)
 - `WEB_DIST_DIR` frontend static directory for Go server hosting (default `frontend/dist`; container uses `/app/web`)
+
+`POST /api/v1/auth/login` now accepts `account` (email or phone) + `password`. For compatibility it still accepts legacy `email` + `password`.

@@ -26,6 +26,7 @@ import (
 var (
 	passwordHasLetter = regexp.MustCompile(`[A-Za-z]`)
 	passwordHasDigit  = regexp.MustCompile(`[0-9]`)
+	cnPhonePattern    = regexp.MustCompile(`^1[0-9]{10}$`)
 )
 
 type Config struct {
@@ -33,6 +34,11 @@ type Config struct {
 	AccessTokenTTL      time.Duration
 	RefreshTokenTTL     time.Duration
 	EmailCodeTTL        time.Duration
+	SMSCodeTTL          time.Duration
+	SMSRateWindow       time.Duration
+	SMSResendInterval   time.Duration
+	SMSMaxPerPhone      int
+	SMSMaxPerIP         int
 	PasswordResetTTL    time.Duration
 	BcryptCost          int
 	DefaultTenantPrefix string
@@ -47,6 +53,21 @@ func (c Config) withDefaults() Config {
 	}
 	if c.EmailCodeTTL <= 0 {
 		c.EmailCodeTTL = 10 * time.Minute
+	}
+	if c.SMSCodeTTL <= 0 {
+		c.SMSCodeTTL = 10 * time.Minute
+	}
+	if c.SMSRateWindow <= 0 {
+		c.SMSRateWindow = 10 * time.Minute
+	}
+	if c.SMSResendInterval <= 0 {
+		c.SMSResendInterval = 60 * time.Second
+	}
+	if c.SMSMaxPerPhone <= 0 {
+		c.SMSMaxPerPhone = 5
+	}
+	if c.SMSMaxPerIP <= 0 {
+		c.SMSMaxPerIP = 20
 	}
 	if c.PasswordResetTTL <= 0 {
 		c.PasswordResetTTL = 15 * time.Minute
@@ -65,14 +86,19 @@ type EmailProvider interface {
 	SendPasswordResetToken(ctx context.Context, email, token string) error
 }
 
+type SMSProvider interface {
+	SendRegisterCode(ctx context.Context, phone, code string) error
+}
+
 type Service struct {
 	db    *sql.DB
 	cfg   Config
 	email EmailProvider
+	sms   SMSProvider
 	audit *audit.Service
 }
 
-func NewService(db *sql.DB, cfg Config, email EmailProvider, auditSvc *audit.Service) (*Service, error) {
+func NewService(db *sql.DB, cfg Config, email EmailProvider, sms SMSProvider, auditSvc *audit.Service) (*Service, error) {
 	cfg = cfg.withDefaults()
 	if strings.TrimSpace(cfg.JWTSigningKey) == "" {
 		return nil, errors.New("JWT_SIGNING_KEY is required")
@@ -80,10 +106,13 @@ func NewService(db *sql.DB, cfg Config, email EmailProvider, auditSvc *audit.Ser
 	if email == nil {
 		return nil, errors.New("email provider is required")
 	}
+	if sms == nil {
+		return nil, errors.New("sms provider is required")
+	}
 	if db == nil {
 		return nil, errors.New("db is required")
 	}
-	return &Service{db: db, cfg: cfg, email: email, audit: auditSvc}, nil
+	return &Service{db: db, cfg: cfg, email: email, sms: sms, audit: auditSvc}, nil
 }
 
 type APIError struct {
@@ -117,6 +146,18 @@ type RegisterInput struct {
 type RegisterResult struct {
 	UserID   string `json:"user_id"`
 	TenantID string `json:"tenant_id"`
+}
+
+type SendSMSCodeInput struct {
+	Phone   string
+	Purpose string
+}
+
+type RegisterPhoneInput struct {
+	Phone       string
+	Code        string
+	Password    string
+	DisplayName string
 }
 
 func (s *Service) Register(ctx context.Context, in RegisterInput, remoteAddr, userAgent string) (RegisterResult, error) {
@@ -201,6 +242,170 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, remoteAddr, us
 	return RegisterResult{UserID: userID, TenantID: tenantID}, nil
 }
 
+func (s *Service) SendSMSCode(ctx context.Context, in SendSMSCodeInput, remoteAddr string) error {
+	phone := strings.TrimSpace(in.Phone)
+	if err := validateCNPhone(phone); err != nil {
+		return apiError(400, "invalid_phone", err.Error())
+	}
+	in.Purpose = strings.TrimSpace(in.Purpose)
+	if in.Purpose == "" {
+		in.Purpose = "register"
+	}
+	if in.Purpose != "register" {
+		return apiError(400, "invalid_purpose", "unsupported sms purpose")
+	}
+
+	if remoteAddr == "" {
+		remoteAddr = "unknown"
+	}
+
+	var recentByPhone int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM sms_verifications
+		WHERE phone=$1 AND purpose=$2 AND created_at > NOW() - $3::INTERVAL
+	`, phone, in.Purpose, formatPGInterval(s.cfg.SMSRateWindow)).Scan(&recentByPhone)
+	if err != nil {
+		return err
+	}
+	if recentByPhone >= s.cfg.SMSMaxPerPhone {
+		return apiError(429, "too_many_requests", "too many requests for this phone")
+	}
+
+	var recentByIP int
+	err = s.db.QueryRowContext(ctx, `
+		SELECT COUNT(1)
+		FROM sms_verifications
+		WHERE request_ip=$1 AND purpose=$2 AND created_at > NOW() - $3::INTERVAL
+	`, remoteAddr, in.Purpose, formatPGInterval(s.cfg.SMSRateWindow)).Scan(&recentByIP)
+	if err != nil {
+		return err
+	}
+	if recentByIP >= s.cfg.SMSMaxPerIP {
+		return apiError(429, "too_many_requests", "too many requests from this IP")
+	}
+
+	var lastCreatedAt time.Time
+	err = s.db.QueryRowContext(ctx, `
+		SELECT created_at
+		FROM sms_verifications
+		WHERE phone=$1 AND purpose=$2
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, phone, in.Purpose).Scan(&lastCreatedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil && time.Since(lastCreatedAt) < s.cfg.SMSResendInterval {
+		return apiError(429, "too_many_requests", "sms code requested too frequently")
+	}
+
+	code := randomDigits(6)
+	verificationID := "sv_" + randomID(12)
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO sms_verifications (id, phone, purpose, code_hash, expires_at, created_at, request_ip)
+		VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+	`, verificationID, phone, in.Purpose, hashToken(code), time.Now().UTC().Add(s.cfg.SMSCodeTTL), remoteAddr)
+	if err != nil {
+		return err
+	}
+
+	if err := s.sms.SendRegisterCode(ctx, phone, code); err != nil {
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM sms_verifications WHERE id=$1`, verificationID)
+		log.Printf("send sms verify code failed: phone=%s err=%v", phone, err)
+		return apiError(500, "sms_send_failed", "failed to send sms verification code")
+	}
+	return nil
+}
+
+func (s *Service) RegisterByPhone(ctx context.Context, in RegisterPhoneInput, remoteAddr, userAgent string) (RegisterResult, error) {
+	phone := strings.TrimSpace(in.Phone)
+	if err := validateCNPhone(phone); err != nil {
+		return RegisterResult{}, apiError(400, "invalid_phone", err.Error())
+	}
+	if strings.TrimSpace(in.Code) == "" {
+		return RegisterResult{}, apiError(400, "invalid_request", "code is required")
+	}
+	if err := validatePassword(in.Password); err != nil {
+		return RegisterResult{}, apiError(400, "weak_password", err.Error())
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), s.cfg.BcryptCost)
+	if err != nil {
+		return RegisterResult{}, err
+	}
+
+	userID := "u_" + randomID(12)
+	tenantID := fmt.Sprintf("%s-%s", s.cfg.DefaultTenantPrefix, randomID(8))
+	now := time.Now().UTC()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return RegisterResult{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE sms_verifications
+		SET used_at = NOW()
+		WHERE phone=$1
+		  AND purpose='register'
+		  AND code_hash=$2
+		  AND used_at IS NULL
+		  AND expires_at > NOW()
+	`, phone, hashToken(strings.TrimSpace(in.Code)))
+	if err != nil {
+		return RegisterResult{}, err
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return RegisterResult{}, apiError(400, "invalid_verification_code", "invalid verification code")
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO users (id, email, phone, password_hash, display_name, phone_verified_at, created_at, updated_at, status)
+		VALUES ($1, NULL, $2, $3, $4, $5, $5, $5, 'active')
+	`, userID, phone, string(hash), strings.TrimSpace(in.DisplayName), now)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return RegisterResult{}, apiError(409, "phone_already_exists", "phone already exists")
+		}
+		return RegisterResult{}, err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO tenants (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, $4)
+	`, tenantID, "Personal Workspace", userID, now)
+	if err != nil {
+		return RegisterResult{}, err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO tenant_members (tenant_id, user_id, role, created_at)
+		VALUES ($1, $2, 'tenant_admin', $3)
+	`, tenantID, userID, now)
+	if err != nil {
+		return RegisterResult{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return RegisterResult{}, err
+	}
+
+	s.recordAudit(ctx, models.AuditEvent{
+		Actor:     userID,
+		Action:    "auth_register_phone",
+		Resource:  "user",
+		Result:    "success",
+		TenantID:  tenantID,
+		IP:        remoteAddr,
+		UserAgent: userAgent,
+	})
+
+	return RegisterResult{UserID: userID, TenantID: tenantID}, nil
+}
+
 type VerifyEmailInput struct {
 	Email string
 	Code  string
@@ -258,40 +463,62 @@ type TokenPair struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func (s *Service) Login(ctx context.Context, email, password, remoteAddr, userAgent string) (TokenPair, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" || strings.TrimSpace(password) == "" {
-		return TokenPair{}, apiError(400, "invalid_request", "email and password are required")
+func (s *Service) Login(ctx context.Context, account, password, remoteAddr, userAgent string) (TokenPair, error) {
+	account = strings.TrimSpace(account)
+	if account == "" || strings.TrimSpace(password) == "" {
+		return TokenPair{}, apiError(400, "invalid_request", "account and password are required")
+	}
+
+	lookupByPhone := cnPhonePattern.MatchString(account)
+	lookupValue := strings.ToLower(account)
+	if lookupByPhone {
+		lookupValue = account
 	}
 
 	var (
 		userID          string
 		passwordHash    string
 		emailVerifiedAt sql.NullTime
+		phoneVerifiedAt sql.NullTime
 		tenantID        string
 		role            string
 	)
 
-	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.password_hash, u.email_verified_at, tm.tenant_id, tm.role
+	query := `
+		SELECT u.id, u.password_hash, u.email_verified_at, u.phone_verified_at, tm.tenant_id, tm.role
 		FROM users u
 		JOIN tenant_members tm ON tm.user_id=u.id
 		WHERE u.email=$1
 		ORDER BY tm.created_at ASC
 		LIMIT 1
-	`, email).Scan(&userID, &passwordHash, &emailVerifiedAt, &tenantID, &role)
+	`
+	if lookupByPhone {
+		query = `
+			SELECT u.id, u.password_hash, u.email_verified_at, u.phone_verified_at, tm.tenant_id, tm.role
+			FROM users u
+			JOIN tenant_members tm ON tm.user_id=u.id
+			WHERE u.phone=$1
+			ORDER BY tm.created_at ASC
+			LIMIT 1
+		`
+	}
+
+	err := s.db.QueryRowContext(ctx, query, lookupValue).Scan(&userID, &passwordHash, &emailVerifiedAt, &phoneVerifiedAt, &tenantID, &role)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return TokenPair{}, apiError(401, "invalid_credentials", "invalid email or password")
+			return TokenPair{}, apiError(401, "invalid_credentials", "invalid account or password")
 		}
 		return TokenPair{}, err
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) != nil {
 		s.recordAudit(ctx, models.AuditEvent{Actor: userID, Action: "auth_login", Resource: "session", Result: "deny", TenantID: tenantID, IP: remoteAddr, UserAgent: userAgent})
-		return TokenPair{}, apiError(401, "invalid_credentials", "invalid email or password")
+		return TokenPair{}, apiError(401, "invalid_credentials", "invalid account or password")
 	}
-	if !emailVerifiedAt.Valid {
+	if lookupByPhone && !phoneVerifiedAt.Valid {
+		return TokenPair{}, apiError(403, "phone_not_verified", "phone is not verified")
+	}
+	if !lookupByPhone && !emailVerifiedAt.Valid {
 		return TokenPair{}, apiError(403, "email_not_verified", "email is not verified")
 	}
 
@@ -503,7 +730,7 @@ func (s *Service) AuthenticateAccessToken(ctx context.Context, token string) (id
 	var email string
 	var currentRole string
 	err = s.db.QueryRowContext(ctx, `
-		SELECT u.email, tm.role
+		SELECT COALESCE(u.email, ''), tm.role
 		FROM users u
 		JOIN tenant_members tm ON tm.user_id=u.id
 		WHERE u.id=$1 AND tm.tenant_id=$2
@@ -523,7 +750,7 @@ func (s *Service) AuthenticateAccessToken(ctx context.Context, token string) (id
 
 func (s *Service) ListTenantMembers(ctx context.Context, tenantID string) ([]identity.Principal, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT tm.tenant_id, tm.user_id, u.email, tm.role
+		SELECT tm.tenant_id, tm.user_id, COALESCE(u.email, ''), tm.role
 		FROM tenant_members tm
 		JOIN users u ON u.id=tm.user_id
 		WHERE tm.tenant_id=$1
@@ -595,6 +822,16 @@ func validateEmail(email string) error {
 	return nil
 }
 
+func validateCNPhone(phone string) error {
+	if phone == "" {
+		return errors.New("phone is required")
+	}
+	if !cnPhonePattern.MatchString(phone) {
+		return errors.New("invalid phone")
+	}
+	return nil
+}
+
 func validatePassword(password string) error {
 	if len(password) < 8 {
 		return errors.New("password must be at least 8 characters")
@@ -603,6 +840,14 @@ func validatePassword(password string) error {
 		return errors.New("password must contain letters and digits")
 	}
 	return nil
+}
+
+func formatPGInterval(d time.Duration) string {
+	seconds := int(d / time.Second)
+	if seconds <= 0 {
+		seconds = 1
+	}
+	return fmt.Sprintf("%d seconds", seconds)
 }
 
 func randomID(n int) string {
