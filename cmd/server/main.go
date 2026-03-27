@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -19,16 +18,21 @@ import (
 	"github.com/warjiang/portal/internal/providers/authzopenfga"
 	"github.com/warjiang/portal/internal/providers/smsaliyun"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
-	db, err := sql.Open("postgres", envOr("DATABASE_URL", "postgres://openfga:openfga@localhost:5432/openfga?sslmode=disable"))
+	db, err := gorm.Open(postgres.Open(envOr("DATABASE_URL", "postgres://openfga:openfga@localhost:5432/openfga?sslmode=disable")), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("open database failed: %v", err)
 	}
-	defer db.Close()
-	if err := db.Ping(); err != nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("get std database failed: %v", err)
+	}
+	defer sqlDB.Close()
+	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("ping database failed: %v", err)
 	}
 	if err := authn.Migrate(context.Background(), db); err != nil {

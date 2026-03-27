@@ -2,10 +2,11 @@ package authn
 
 import (
 	"context"
-	"database/sql"
+
+	"gorm.io/gorm"
 )
 
-func Migrate(ctx context.Context, db *sql.DB) error {
+func Migrate(ctx context.Context, db *gorm.DB) error {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
@@ -84,7 +85,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	}
 
 	for _, stmt := range stmts {
-		if _, err := db.ExecContext(ctx, stmt); err != nil {
+		if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
 			return err
 		}
 	}
