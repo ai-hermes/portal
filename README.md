@@ -44,6 +44,15 @@ docker build -f Dockerfile.backend -t ai-hermes-portal-backend:local .
 
 The backend image now includes built frontend assets and serves both UI and API.
 
+For private registry mirror of base images (set `IMAGE_REGISTRY` without trailing `/`, for example `registry.example.com/dockerhub`):
+
+```bash
+docker build \
+  --build-arg IMAGE_REGISTRY=registry.example.com/dockerhub \
+  -f Dockerfile.backend \
+  -t ai-hermes-portal-backend:local .
+```
+
 ### Run local stack (backend + OpenFGA + Postgres)
 
 ```bash
@@ -51,6 +60,13 @@ docker compose up --build
 ```
 
 Portal UI and backend API are both available at `http://localhost:8080`, and OpenFGA is at `http://localhost:8081`.
+
+Compose uses `IMAGE_REGISTRY` to build/pull all base images (default `docker.io`).  
+Set `IMAGE_REGISTRY` in `.env` (or export it in shell):
+
+```bash
+IMAGE_REGISTRY=registry.example.com/dockerhub
+```
 
 ### Initialize OpenFGA model/store (optional profile)
 

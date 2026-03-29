@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        IMAGE_REGISTRY: "${IMAGE_REGISTRY:-docker.io}"
     environment:
       PORT: ":8080"
       AUTHZ_PROVIDER: "${AUTHZ_PROVIDER:-memory}"
@@ -22,7 +24,7 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:16-alpine
+    image: "${IMAGE_REGISTRY:-docker.io}/postgres:16-alpine"
     environment:
       POSTGRES_DB: openfga
       POSTGRES_USER: openfga
@@ -38,7 +40,7 @@ services:
       retries: 20
 
   openfga-migrate:
-    image: openfga/openfga:latest
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
     command: migrate
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
@@ -49,7 +51,7 @@ services:
     restart: "no"
 
   openfga:
-    image: openfga/openfga:latest
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
     command: run
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
@@ -68,7 +70,7 @@ services:
       retries: 10
 
   openfga-init:
-    image: curlimages/curl:8.8.0
+    image: "${IMAGE_REGISTRY:-docker.io}/curlimages/curl:8.8.0"
     profiles: ["init"]
     volumes:
       - ./scripts/openfga/init-model.sh:/init-model.sh:ro
