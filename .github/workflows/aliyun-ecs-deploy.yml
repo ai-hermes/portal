@@ -103,6 +103,7 @@ jobs:
                 printf 'AUTHZ_PROVIDER=memory\n'
                 printf 'OPENFGA_API_URL=\n'
                 printf 'OPENFGA_STORE_ID=\n'
+                printf 'OPENFGA_DATASTORE_URI=%s\n' "${{ secrets.DATABASE_URL }}"
               } > .env
             else
               if grep -q '^BACKEND_IMAGE=' .env; then
@@ -114,6 +115,11 @@ jobs:
                 sed -i.bak "s|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${{ secrets.IMAGE_REGISTRY }}|" .env
               else
                 printf '\nIMAGE_REGISTRY=%s\n' "${{ secrets.IMAGE_REGISTRY }}" >> .env
+              fi
+              if grep -q '^OPENFGA_DATASTORE_URI=' .env; then
+                sed -i.bak "s|^OPENFGA_DATASTORE_URI=.*|OPENFGA_DATASTORE_URI=${{ secrets.DATABASE_URL }}|" .env
+              else
+                printf '\nOPENFGA_DATASTORE_URI=%s\n' "${{ secrets.DATABASE_URL }}" >> .env
               fi
             fi
 
