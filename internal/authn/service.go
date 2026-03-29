@@ -90,15 +90,20 @@ type SMSProvider interface {
 	SendRegisterCode(ctx context.Context, phone, code string) error
 }
 
-type Service struct {
-	db    *gorm.DB
-	cfg   Config
-	email EmailProvider
-	sms   SMSProvider
-	audit *audit.Service
+type UserProvisioner interface {
+	EnsureUserProvisioned(ctx context.Context, tenantID, userID string) error
 }
 
-func NewService(db *gorm.DB, cfg Config, email EmailProvider, sms SMSProvider, auditSvc *audit.Service) (*Service, error) {
+type Service struct {
+	db          *gorm.DB
+	cfg         Config
+	email       EmailProvider
+	sms         SMSProvider
+	audit       *audit.Service
+	provisioner UserProvisioner
+}
+
+func NewService(db *gorm.DB, cfg Config, email EmailProvider, sms SMSProvider, auditSvc *audit.Service, provisioner UserProvisioner) (*Service, error) {
 	cfg = cfg.withDefaults()
 	if strings.TrimSpace(cfg.JWTSigningKey) == "" {
 		return nil, errors.New("JWT_SIGNING_KEY is required")
@@ -112,7 +117,7 @@ func NewService(db *gorm.DB, cfg Config, email EmailProvider, sms SMSProvider, a
 	if db == nil {
 		return nil, errors.New("db is required")
 	}
-	return &Service{db: db, cfg: cfg, email: email, sms: sms, audit: auditSvc}, nil
+	return &Service{db: db, cfg: cfg, email: email, sms: sms, audit: auditSvc, provisioner: provisioner}, nil
 }
 
 type userModel struct {
@@ -321,6 +326,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, remoteAddr, us
 		IP:        remoteAddr,
 		UserAgent: userAgent,
 	})
+	s.ensureLiteLLMProvisioned(ctx, userID, tenantID, remoteAddr, userAgent, "register")
 
 	return RegisterResult{UserID: userID, TenantID: tenantID}, nil
 }
@@ -481,6 +487,7 @@ func (s *Service) RegisterByPhone(ctx context.Context, in RegisterPhoneInput, re
 		IP:        remoteAddr,
 		UserAgent: userAgent,
 	})
+	s.ensureLiteLLMProvisioned(ctx, userID, tenantID, remoteAddr, userAgent, "register_phone")
 
 	return RegisterResult{UserID: userID, TenantID: tenantID}, nil
 }
@@ -587,6 +594,7 @@ func (s *Service) Login(ctx context.Context, account, password, remoteAddr, user
 	}
 
 	s.recordAudit(ctx, models.AuditEvent{Actor: row.UserID, Action: "auth_login", Resource: "session", Result: "success", TenantID: row.TenantID, IP: remoteAddr, UserAgent: userAgent})
+	s.ensureLiteLLMProvisioned(ctx, row.UserID, row.TenantID, remoteAddr, userAgent, "login")
 	return pair, nil
 }
 
@@ -979,4 +987,32 @@ func (s *Service) recordAudit(ctx context.Context, event models.AuditEvent) {
 		return
 	}
 	_, _ = s.audit.Record(ctx, event)
+}
+
+func (s *Service) ensureLiteLLMProvisioned(ctx context.Context, userID, tenantID, remoteAddr, userAgent, trigger string) {
+	if s.provisioner == nil {
+		return
+	}
+	if err := s.provisioner.EnsureUserProvisioned(ctx, tenantID, userID); err != nil {
+		log.Printf("litellm auto provision failed: trigger=%s tenant_id=%s user_id=%s err=%v", trigger, tenantID, userID, err)
+		s.recordAudit(ctx, models.AuditEvent{
+			Actor:     userID,
+			Action:    "litellm_auto_provision_" + trigger,
+			Resource:  "litellm_key",
+			Result:    "fail",
+			TenantID:  tenantID,
+			IP:        remoteAddr,
+			UserAgent: userAgent,
+		})
+		return
+	}
+	s.recordAudit(ctx, models.AuditEvent{
+		Actor:     userID,
+		Action:    "litellm_auto_provision_" + trigger,
+		Resource:  "litellm_key",
+		Result:    "success",
+		TenantID:  tenantID,
+		IP:        remoteAddr,
+		UserAgent: userAgent,
+	})
 }

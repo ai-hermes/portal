@@ -52,6 +52,7 @@ type KeyRecord struct {
 type GenerateKeyInput struct {
 	KeyAlias  string
 	MaxBudget float64
+	UserID    string
 	Metadata  map[string]any
 }
 
@@ -59,6 +60,9 @@ func (c *Client) GenerateKey(ctx context.Context, in GenerateKeyInput) (KeyRecor
 	payload := map[string]any{
 		"key_alias":  strings.TrimSpace(in.KeyAlias),
 		"max_budget": in.MaxBudget,
+	}
+	if userID := strings.TrimSpace(in.UserID); userID != "" {
+		payload["user_id"] = userID
 	}
 	if len(in.Metadata) > 0 {
 		payload["metadata"] = in.Metadata
@@ -68,6 +72,36 @@ func (c *Client) GenerateKey(ctx context.Context, in GenerateKeyInput) (KeyRecor
 		return KeyRecord{}, err
 	}
 	return keyRecordFromMap(resp)
+}
+
+type EnsureUserInput struct {
+	UserID   string
+	UserRole string
+	Metadata map[string]any
+}
+
+func (c *Client) EnsureUser(ctx context.Context, in EnsureUserInput) error {
+	userID := strings.TrimSpace(in.UserID)
+	if userID == "" {
+		return errors.New("user id is required")
+	}
+	payload := map[string]any{
+		"user_id": userID,
+	}
+	if role := strings.TrimSpace(in.UserRole); role != "" {
+		payload["user_role"] = role
+	}
+	if len(in.Metadata) > 0 {
+		payload["metadata"] = in.Metadata
+	}
+	_, err := c.doJSON(ctx, http.MethodPost, "/user/new", payload)
+	if err == nil {
+		return nil
+	}
+	if isAlreadyExistsError(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *Client) GetKeyInfo(ctx context.Context, apiKey string) (KeyRecord, error) {
@@ -261,4 +295,16 @@ func firstNumber(m map[string]any, keys ...string) (float64, bool) {
 func asMap(v any) (map[string]any, bool) {
 	m, ok := v.(map[string]any)
 	return m, ok
+}
+
+func isAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "exists") ||
+		strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "conflict") ||
+		strings.Contains(msg, "409")
 }

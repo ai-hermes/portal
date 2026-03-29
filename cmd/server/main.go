@@ -51,6 +51,7 @@ func main() {
 	auditSvc := audit.NewService(auditStore)
 	authzProvider := selectAuthzProvider()
 	smsProvider := selectSMSProvider()
+	liteLLMCreditSvc := buildLiteLLMCreditService(db)
 	authnSvc, err := authn.NewService(db, authn.Config{
 		JWTSigningKey:     envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
 		AccessTokenTTL:    parseDurationOr("ACCESS_TOKEN_TTL", 15*time.Minute),
@@ -62,13 +63,12 @@ func main() {
 		SMSMaxPerPhone:    parseIntOr("SMS_MAX_PER_PHONE", 5),
 		SMSMaxPerIP:       parseIntOr("SMS_MAX_PER_IP", 20),
 		PasswordResetTTL:  parseDurationOr("PASSWORD_RESET_TTL", 15*time.Minute),
-	}, authn.NewLogEmailProvider(), smsProvider, auditSvc)
+	}, authn.NewLogEmailProvider(), smsProvider, auditSvc, liteLLMCreditSvc)
 	if err != nil {
 		log.Fatalf("create auth service failed: %v", err)
 	}
 
 	authzSvc := authz.NewService(authzProvider)
-	liteLLMCreditSvc := buildLiteLLMCreditService(db)
 
 	router := api.NewRouter(api.Dependencies{
 		Authn:         authnSvc,
@@ -100,10 +100,10 @@ func main() {
 }
 
 func buildLiteLLMCreditService(db *gorm.DB) *litellmcredit.Service {
-	baseURL := strings.TrimSpace(os.Getenv("LITELLM_BASE_URL"))
+	baseURL := strings.TrimSpace(envOr("LITELLM_BASE_URL", "https://llmv2.spotty.com.cn/"))
 	masterKey := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY"))
-	if baseURL == "" || masterKey == "" {
-		log.Printf("litellm credit service disabled: missing LITELLM_BASE_URL or LITELLM_MASTER_KEY")
+	if masterKey == "" {
+		log.Printf("litellm credit service disabled: missing LITELLM_MASTER_KEY")
 		return nil
 	}
 
@@ -121,6 +121,7 @@ func buildLiteLLMCreditService(db *gorm.DB) *litellmcredit.Service {
 
 	service, err := litellmcredit.NewService(db, client, litellmcredit.Config{
 		PlatformAdminEmails: litellmcredit.ParsePlatformAdminEmails(os.Getenv("PLATFORM_ADMIN_EMAILS")),
+		DefaultUserQuota:    parseFloatOr("LITELLM_DEFAULT_USER_QUOTA", 10),
 	})
 	if err != nil {
 		log.Printf("litellm credit service disabled: create service failed: %v", err)
@@ -232,6 +233,19 @@ func parseIntOr(key string, fallback int) int {
 	parsed, err := strconv.Atoi(raw)
 	if err != nil {
 		log.Printf("invalid int for %s=%s, fallback=%d", key, raw, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func parseFloatOr(key string, fallback float64) float64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		log.Printf("invalid float for %s=%s, fallback=%f", key, raw, fallback)
 		return fallback
 	}
 	return parsed

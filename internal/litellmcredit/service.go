@@ -41,10 +41,12 @@ type Service struct {
 	db             *gorm.DB
 	client         *litellm.Client
 	platformAdmins map[string]struct{}
+	defaultQuota   float64
 }
 
 type Config struct {
 	PlatformAdminEmails []string
+	DefaultUserQuota    float64
 }
 
 func ParsePlatformAdminEmails(raw string) []string {
@@ -80,7 +82,16 @@ func NewService(db *gorm.DB, client *litellm.Client, cfg Config) (*Service, erro
 		}
 		admins[norm] = struct{}{}
 	}
-	return &Service{db: db, client: client, platformAdmins: admins}, nil
+	defaultQuota := cfg.DefaultUserQuota
+	if math.IsNaN(defaultQuota) || math.IsInf(defaultQuota, 0) || defaultQuota <= 0 {
+		defaultQuota = 10
+	}
+	return &Service{
+		db:             db,
+		client:         client,
+		platformAdmins: admins,
+		defaultQuota:   defaultQuota,
+	}, nil
 }
 
 func (s *Service) IsPlatformAdmin(principal identity.Principal) bool {
@@ -122,6 +133,50 @@ type CreditEvent struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+func (s *Service) EnsureUserProvisioned(ctx context.Context, tenantID, userID string) error {
+	tenantID = strings.TrimSpace(tenantID)
+	userID = strings.TrimSpace(userID)
+	if tenantID == "" || userID == "" {
+		return apiError(400, "invalid_request", "tenant_id and user_id are required")
+	}
+	email, err := s.ensureTenantUser(ctx, tenantID, userID)
+	if err != nil {
+		return err
+	}
+	key, created, err := s.ensureUserKey(ctx, tenantID, userID, email)
+	if err != nil {
+		s.recordEvent(ctx, creditEventInput{
+			actor:        systemActor(),
+			tenantID:     tenantID,
+			userID:       userID,
+			mode:         "auto_provision",
+			amount:       s.defaultQuota,
+			beforeBudget: 0,
+			afterBudget:  0,
+			reason:       "auto_provision",
+			result:       "fail",
+			errorMessage: err.Error(),
+		})
+		return err
+	}
+	result := "skip_existing"
+	if created {
+		result = "success"
+	}
+	s.recordEvent(ctx, creditEventInput{
+		actor:        systemActor(),
+		tenantID:     tenantID,
+		userID:       userID,
+		mode:         "auto_provision",
+		amount:       s.defaultQuota,
+		beforeBudget: 0,
+		afterBudget:  key.LastBudgetTotal,
+		reason:       "auto_provision",
+		result:       result,
+	})
+	return nil
+}
+
 func (s *Service) GetUserCredit(ctx context.Context, actor identity.Principal, tenantID, userID string) (CreditSnapshot, error) {
 	if !s.IsPlatformAdmin(actor) {
 		return CreditSnapshot{}, apiError(403, "insufficient_role", "platform admin role required")
@@ -131,11 +186,12 @@ func (s *Service) GetUserCredit(ctx context.Context, actor identity.Principal, t
 	if tenantID == "" || userID == "" {
 		return CreditSnapshot{}, apiError(400, "invalid_request", "tenant_id and user_id are required")
 	}
-	if _, err := s.ensureTenantUser(ctx, tenantID, userID); err != nil {
+	email, err := s.ensureTenantUser(ctx, tenantID, userID)
+	if err != nil {
 		return CreditSnapshot{}, err
 	}
 
-	key, err := s.ensureUserKey(ctx, tenantID, userID)
+	key, _, err := s.ensureUserKey(ctx, tenantID, userID, email)
 	if err != nil {
 		return CreditSnapshot{}, err
 	}
@@ -182,10 +238,11 @@ func (s *Service) AdjustUserCredit(ctx context.Context, actor identity.Principal
 		return CreditSnapshot{}, apiError(400, "invalid_amount", "amount must be a finite number")
 	}
 
-	if _, err := s.ensureTenantUser(ctx, in.TenantID, in.UserID); err != nil {
+	email, err := s.ensureTenantUser(ctx, in.TenantID, in.UserID)
+	if err != nil {
 		return CreditSnapshot{}, err
 	}
-	key, err := s.ensureUserKey(ctx, in.TenantID, in.UserID)
+	key, _, err := s.ensureUserKey(ctx, in.TenantID, in.UserID, email)
 	if err != nil {
 		return CreditSnapshot{}, err
 	}
@@ -341,30 +398,55 @@ func (s *Service) ensureTenantUser(ctx context.Context, tenantID, userID string)
 	return *row.Email, nil
 }
 
-func (s *Service) ensureUserKey(ctx context.Context, tenantID, userID string) (litellmUserKeyModel, error) {
+func (s *Service) ensureUserKey(ctx context.Context, tenantID, userID, email string) (litellmUserKeyModel, bool, error) {
 	var model litellmUserKeyModel
 	err := s.db.WithContext(ctx).
 		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
 		Take(&model).Error
 	if err == nil {
-		return model, nil
+		return model, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return litellmUserKeyModel{}, err
+		return litellmUserKeyModel{}, false, err
 	}
 
 	now := time.Now().UTC()
 	alias := fmt.Sprintf("%s:%s", tenantID, userID)
+	litellmUserID := buildLiteLLMUserID(tenantID, userID)
+	if err := s.client.EnsureUser(ctx, litellm.EnsureUserInput{
+		UserID: litellmUserID,
+		Metadata: map[string]any{
+			"tenant_id":    tenantID,
+			"portal_user":  userID,
+			"portal_email": email,
+		},
+	}); err != nil {
+		return litellmUserKeyModel{}, false, apiError(502, "litellm_error", err.Error())
+	}
 	generated, err := s.client.GenerateKey(ctx, litellm.GenerateKeyInput{
 		KeyAlias:  alias,
-		MaxBudget: 0,
+		MaxBudget: s.defaultQuota,
+		UserID:    litellmUserID,
 		Metadata: map[string]any{
 			"tenant_id": tenantID,
 			"user_id":   userID,
+			"email":     email,
 		},
 	})
 	if err != nil {
-		return litellmUserKeyModel{}, apiError(502, "litellm_error", err.Error())
+		return litellmUserKeyModel{}, false, apiError(502, "litellm_error", err.Error())
+	}
+	if s.defaultQuota > 0 && generated.MaxBudget < s.defaultQuota {
+		updated, updateErr := s.client.UpdateKeyBudget(ctx, generated.APIKey, s.defaultQuota)
+		if updateErr != nil {
+			return litellmUserKeyModel{}, false, apiError(502, "litellm_error", updateErr.Error())
+		}
+		generated.MaxBudget = updated.MaxBudget
+		generated.Spend = updated.Spend
+		generated.KeyAlias = firstNonEmpty(updated.KeyAlias, generated.KeyAlias)
+	}
+	if generated.MaxBudget <= 0 {
+		generated.MaxBudget = s.defaultQuota
 	}
 	model = litellmUserKeyModel{
 		ID:              "lk_" + randomID(12),
@@ -382,12 +464,12 @@ func (s *Service) ensureUserKey(ctx context.Context, tenantID, userID string) (l
 		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "SQLSTATE 23505") {
 			var existing litellmUserKeyModel
 			if findErr := s.db.WithContext(ctx).Where("tenant_id = ? AND user_id = ?", tenantID, userID).Take(&existing).Error; findErr == nil {
-				return existing, nil
+				return existing, false, nil
 			}
 		}
-		return litellmUserKeyModel{}, err
+		return litellmUserKeyModel{}, false, err
 	}
-	return model, nil
+	return model, true, nil
 }
 
 type creditEventInput struct {
@@ -454,4 +536,15 @@ func randomID(n int) string {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)[:n]
+}
+
+func systemActor() identity.Principal {
+	return identity.Principal{
+		UserID: "system",
+		Email:  "system@internal",
+	}
+}
+
+func buildLiteLLMUserID(tenantID, userID string) string {
+	return fmt.Sprintf("%s:%s", strings.TrimSpace(tenantID), strings.TrimSpace(userID))
 }
