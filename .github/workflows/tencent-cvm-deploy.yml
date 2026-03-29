@@ -1,6 +1,8 @@
-name: aliyun-ecs-deploy
+name: tencent-cvm-deploy
 
 on:
+  push:
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -12,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: aliyun-ecs-deploy-${{ github.ref }}
+  group: tencent-cvm-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -73,22 +75,22 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf '%s\n' "${{ secrets.CVM_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Copy deploy files to ECS
+      - name: Copy deploy files to CVM
         run: |
-          SCP_PORT="${{ secrets.ECS_PORT }}"
-          if [ -z "$SCP_PORT" ]; then SCP_PORT=22; fi
-          ssh -p "$SCP_PORT" -o StrictHostKeyChecking=no "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" "mkdir -p '${{ secrets.ECS_DEPLOY_PATH }}'"
-          scp -P "$SCP_PORT" -o StrictHostKeyChecking=no \
+          SSH_PORT="${{ secrets.CVM_PORT }}"
+          if [ -z "$SSH_PORT" ]; then SSH_PORT=22; fi
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}" "mkdir -p '${{ secrets.CVM_DEPLOY_PATH }}'"
+          scp -P "$SSH_PORT" -o StrictHostKeyChecking=no \
             deploy/ecs/docker-compose.prod.yml \
             deploy/ecs/.env.tmpl \
-            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:${{ secrets.ECS_DEPLOY_PATH }}/"
-          ssh -p "$SCP_PORT" -o StrictHostKeyChecking=no "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
-            "mv '${{ secrets.ECS_DEPLOY_PATH }}/docker-compose.prod.yml' '${{ secrets.ECS_DEPLOY_PATH }}/docker-compose.yml'"
+            "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}:${{ secrets.CVM_DEPLOY_PATH }}/"
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}" \
+            "mv '${{ secrets.CVM_DEPLOY_PATH }}/docker-compose.prod.yml' '${{ secrets.CVM_DEPLOY_PATH }}/docker-compose.yml'"
 
-      - name: Deploy on ECS
+      - name: Deploy on CVM
         env:
           BACKEND_IMAGE: ${{ steps.vars.outputs.image }}
           IMAGE_REGISTRY: ${{ secrets.IMAGE_REGISTRY }}
@@ -104,19 +106,19 @@ jobs:
           ALIYUN_SMS_TEMPLATE_CODE_REGISTER: ${{ secrets.ALIYUN_SMS_TEMPLATE_CODE_REGISTER }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
         run: |
-          SSH_PORT="${{ secrets.ECS_PORT }}"
+          SSH_PORT="${{ secrets.CVM_PORT }}"
           if [ -z "$SSH_PORT" ]; then SSH_PORT=22; fi
 
-          # Render .env locally from template, then push to ECS
+          # Render .env locally from template, then push to CVM
           envsubst < deploy/ecs/.env.tmpl > /tmp/.env.rendered
 
           scp -P "$SSH_PORT" -o StrictHostKeyChecking=no \
             /tmp/.env.rendered \
-            "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:${{ secrets.ECS_DEPLOY_PATH }}/.env"
+            "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}:${{ secrets.CVM_DEPLOY_PATH }}/.env"
 
-          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" << 'EOF'
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}" << 'EOF'
             set -euo pipefail
-            cd "${{ secrets.ECS_DEPLOY_PATH }}"
+            cd "${{ secrets.CVM_DEPLOY_PATH }}"
             echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | docker login "${{ secrets.ALIYUN_ACR_REGISTRY }}" -u "${{ secrets.ALIYUN_ACR_USERNAME }}" --password-stdin
             docker compose pull
             docker compose up -d
@@ -128,7 +130,7 @@ jobs:
           URL=""
 
           if [ -z "$ADDR" ]; then
-            URL="http://${{ secrets.ECS_HOST }}:8080/healthz"
+            URL="http://${{ secrets.CVM_HOST }}:8080/healthz"
           elif [[ "$ADDR" == http://* || "$ADDR" == https://* ]]; then
             URL="$ADDR"
           else
