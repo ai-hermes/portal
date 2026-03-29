@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: "${IMAGE_REGISTRY:-docker.io}/postgres:16-alpine"
+    environment:
+      POSTGRES_DB: openfga
+      POSTGRES_USER: openfga
+      POSTGRES_PASSWORD: openfga
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga -d openfga"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  openfga-migrate:
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "${OPENFGA_DATASTORE_URI:-postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  openfga:
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "${OPENFGA_DATASTORE_URI:-postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable}"
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+      OPENFGA_AUTHN_METHOD: none
+    ports:
+      - "8081:8080"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  openfga-init:
+    image: "${IMAGE_REGISTRY:-docker.io}/curlimages/curl:8.8.0"
+    profiles: ["init"]
+    volumes:
+      - ./scripts/openfga/init-model.sh:/init-model.sh:ro
+    entrypoint: ["sh", "/init-model.sh"]
+    environment:
+      OPENFGA_API_URL: "http://openfga:8080"
+    depends_on:
+      openfga:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

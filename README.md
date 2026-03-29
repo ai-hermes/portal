@@ -61,11 +61,37 @@ docker compose up --build
 
 Portal UI and backend API are both available at `http://localhost:8080`, and OpenFGA is at `http://localhost:8081`.
 
+For non-build startup, point `BACKEND_IMAGE` to a prebuilt image and run without `--build`:
+
+```bash
+BACKEND_IMAGE=registry.example.com/dockerhub/ai-hermes-portal/backend:latest docker compose up
+# or explicitly prevent build:
+docker compose up --no-build
+```
+
+### Local development without building backend/frontend images
+
+Use `docker-compose.local.yml` to start only dependencies (Postgres/OpenFGA), and run backend/frontend on host:
+
+```bash
+docker compose -f docker-compose.local.yml up
+```
+
+Then start apps on host:
+
+```bash
+go run ./cmd/server
+cd frontend && npm install && npm run dev
+```
+
+Backend API runs at `http://localhost:8080`, frontend dev server at `http://localhost:5173`, OpenFGA at `http://localhost:8081`.
+
 Compose uses `IMAGE_REGISTRY` to build/pull all base images (default `docker.io`).  
 Set `IMAGE_REGISTRY` in `.env` (or export it in shell):
 
 ```bash
 IMAGE_REGISTRY=registry.example.com/dockerhub
+BACKEND_IMAGE=registry.example.com/dockerhub/ai-hermes-portal/backend:latest
 ```
 
 ### Initialize OpenFGA model/store (optional profile)
