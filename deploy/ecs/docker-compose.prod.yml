@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: "${IMAGE_REGISTRY:-docker.io}/postgres:16-alpine"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-portal}"
+      POSTGRES_USER: "${POSTGRES_USER:-portal}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-portal} -d ${POSTGRES_DB:-portal}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     image: ${BACKEND_IMAGE}
     container_name: ai-hermes-portal-backend
@@ -31,6 +46,9 @@ services:
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
       OPENFGA_DATASTORE_URI: "${OPENFGA_DATASTORE_URI:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: "no"
 
   openfga:
@@ -51,3 +69,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+
+volumes:
+  postgres-data:

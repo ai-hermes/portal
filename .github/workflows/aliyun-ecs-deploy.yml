@@ -92,6 +92,7 @@ jobs:
         env:
           BACKEND_IMAGE: ${{ steps.vars.outputs.image }}
           IMAGE_REGISTRY: ${{ secrets.IMAGE_REGISTRY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
