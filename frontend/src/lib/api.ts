@@ -18,11 +18,23 @@ export type AuditEvent = {
 export type LiteLLMCreditSnapshot = {
   tenant_id: string;
   user_id: string;
+  api_key?: string;
+  key_alias?: string;
+  litellm_user_id?: string;
   budget_total: number;
   spend_used: number;
   budget_remaining: number;
   unit: string;
   last_synced_at: string;
+};
+
+export type LiteLLMRecentCall = {
+  at: string;
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost: number;
 };
 
 export type LiteLLMCreditEvent = {
@@ -237,6 +249,10 @@ export function getLiteLLMCredit(tenantID: string, userID: string) {
   return apiFetch<LiteLLMCreditSnapshot>(`${apiBaseURL}/api/v1/admin/litellm/credits/${encodeURIComponent(tenantID)}/${encodeURIComponent(userID)}`);
 }
 
+export function getLiteLLMMyCredit() {
+  return apiFetch<LiteLLMCreditSnapshot>(`${apiBaseURL}/api/v1/litellm/me/credit`);
+}
+
 export function adjustLiteLLMCredit(input: {
   tenant_id: string;
   user_id: string;
@@ -253,4 +269,20 @@ export function adjustLiteLLMCredit(input: {
 export function listLiteLLMCreditEvents(limit = 20, offset = 0) {
   const q = `?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
   return apiFetch<{ items: LiteLLMCreditEvent[]; limit: number; offset: number }>(`${apiBaseURL}/api/v1/admin/litellm/events${q}`);
+}
+
+export function listLiteLLMRecentCalls(tenantID: string, userID: string, limit = 20) {
+  const q = `?limit=${encodeURIComponent(String(limit))}`;
+  return apiFetch<{ items: LiteLLMRecentCall[]; limit: number }>(
+    `${apiBaseURL}/api/v1/admin/litellm/calls/${encodeURIComponent(tenantID)}/${encodeURIComponent(userID)}${q}`
+  );
+}
+
+export function listLiteLLMMyRecentCalls(limit = 20) {
+  const q = `?limit=${encodeURIComponent(String(limit))}`;
+  return apiFetch<{ items: LiteLLMRecentCall[]; limit: number }>(`${apiBaseURL}/api/v1/litellm/me/calls${q}`);
+}
+
+export function getLiteLLMAccess() {
+  return apiFetch<{ can_manage: boolean; service_available: boolean }>(`${apiBaseURL}/api/v1/admin/litellm/access`);
 }
