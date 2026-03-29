@@ -26,7 +26,7 @@ services:
       retries: 5
 
   openfga-migrate:
-    image: "${OPENFGA_IMAGE:-openfga/openfga:latest}"
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
     command: migrate
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
@@ -34,7 +34,7 @@ services:
     restart: "no"
 
   openfga:
-    image: "${OPENFGA_IMAGE:-openfga/openfga:latest}"
+    image: "${IMAGE_REGISTRY:-docker.io}/openfga/openfga:latest"
     command: run
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
