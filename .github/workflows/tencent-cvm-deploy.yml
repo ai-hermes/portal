@@ -37,6 +37,9 @@ jobs:
           set -euo pipefail
           test -n "${ACR_REGISTRY}" || (echo "ALIYUN_ACR_REGISTRY is required" && exit 1)
           test -n "${ACR_NAMESPACE}" || (echo "ALIYUN_ACR_NAMESPACE is required" && exit 1)
+          test -n "${{ secrets.CVM_HOST }}" || (echo "CVM_HOST is required" && exit 1)
+          test -n "${{ secrets.CVM_USER }}" || (echo "CVM_USER is required" && exit 1)
+          test -n "${{ secrets.CVM_DEPLOY_PATH }}" || (echo "CVM_DEPLOY_PATH is required" && exit 1)
 
       - name: Compute image tag
         id: vars
@@ -94,6 +97,8 @@ jobs:
         env:
           BACKEND_IMAGE: ${{ steps.vars.outputs.image }}
           IMAGE_REGISTRY: ${{ secrets.IMAGE_REGISTRY }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
