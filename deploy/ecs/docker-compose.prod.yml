@@ -5,13 +5,49 @@ services:
     restart: unless-stopped
     environment:
       PORT: ":8080"
-      AUTHZ_PROVIDER: "${AUTHZ_PROVIDER:-memory}"
-      OPENFGA_API_URL: "${OPENFGA_API_URL:-}"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      JWT_SIGNING_KEY: "${JWT_SIGNING_KEY:-}"
+      ACCESS_TOKEN_TTL: "${ACCESS_TOKEN_TTL:-15m}"
+      REFRESH_TOKEN_TTL: "${REFRESH_TOKEN_TTL:-720h}"
+      EMAIL_CODE_TTL: "${EMAIL_CODE_TTL:-10m}"
+      PASSWORD_RESET_TTL: "${PASSWORD_RESET_TTL:-15m}"
+      AUTHZ_PROVIDER: "${AUTHZ_PROVIDER:-openfga}"
+      OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"
       OPENFGA_STORE_ID: "${OPENFGA_STORE_ID:-}"
     ports:
       - "${HOST_PORT:-8080}:8080"
+    depends_on:
+      openfga:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 10s
       timeout: 3s
       retries: 5
+
+  openfga-migrate:
+    image: "${OPENFGA_IMAGE:-openfga/openfga:latest}"
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "${OPENFGA_DATASTORE_URI:-}"
+    restart: "no"
+
+  openfga:
+    image: "${OPENFGA_IMAGE:-openfga/openfga:latest}"
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "${OPENFGA_DATASTORE_URI:-}"
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+      OPENFGA_AUTHN_METHOD: none
+    ports:
+      - "${HOST_OPENFGA_PORT:-8081}:8080"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10

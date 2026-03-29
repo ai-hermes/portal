@@ -102,6 +102,20 @@ docker compose --profile init up openfga-init
 
 This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTHZ_PROVIDER=openfga`.
 
+## Aliyun ECS deployment
+
+For ECS compose deployment with **external Postgres** and **OpenFGA in compose**, use:
+
+```bash
+cp deploy/ecs/.env.example deploy/ecs/.env
+docker compose --env-file deploy/ecs/.env -f deploy/ecs/docker-compose.prod.yml up -d
+```
+
+Notes:
+- `DATABASE_URL` and `OPENFGA_DATASTORE_URI` should both point to external PostgreSQL (for example, ApsaraDB RDS PostgreSQL).
+- `OPENFGA_API_URL` defaults to `http://openfga:8080` (in-compose service discovery).
+- `OPENFGA_STORE_ID` must be prepared in advance for backend `AUTHZ_PROVIDER=openfga`.
+
 ## v1 APIs
 
 - `POST /api/v1/auth/register`
@@ -144,9 +158,10 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 - `SMS_MAX_PER_PHONE` default `5`
 - `SMS_MAX_PER_IP` default `20`
 - `PASSWORD_RESET_TTL` default `15m`
-- `LITELLM_BASE_URL` LiteLLM service base URL
+- `LITELLM_BASE_URL` LiteLLM service base URL, default `https://llmv2.spotty.com.cn/`
 - `LITELLM_MASTER_KEY` LiteLLM master/admin key
 - `LITELLM_HTTP_TIMEOUT` LiteLLM API timeout, default `5s`
+- `LITELLM_DEFAULT_USER_QUOTA` auto-provision quota for new/first-login users, default `10`
 - `PLATFORM_ADMIN_EMAILS` comma-separated emails allowed to manage LiteLLM credits
 - `SMS_PROVIDER` default `log` (`aliyun` to enable Alibaba Cloud SMS provider)
 - `ALIBABA_CLOUD_REGION_ID` default `cn-hangzhou`
