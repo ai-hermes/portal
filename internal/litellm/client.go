@@ -49,6 +49,15 @@ type KeyRecord struct {
 	Spend     float64
 }
 
+type CallRecord struct {
+	At               time.Time
+	Model            string
+	PromptTokens     int64
+	CompletionTokens int64
+	TotalTokens      int64
+	Cost             float64
+}
+
 type GenerateKeyInput struct {
 	KeyAlias  string
 	MaxBudget float64
@@ -71,7 +80,11 @@ func (c *Client) GenerateKey(ctx context.Context, in GenerateKeyInput) (KeyRecor
 	if err != nil {
 		return KeyRecord{}, err
 	}
-	return keyRecordFromMap(resp)
+	record := keyRecordFromMap(resp)
+	if record.APIKey == "" {
+		return KeyRecord{}, errors.New("litellm response missing api key")
+	}
+	return record, nil
 }
 
 type EnsureUserInput struct {
@@ -115,10 +128,7 @@ func (c *Client) GetKeyInfo(ctx context.Context, apiKey string) (KeyRecord, erro
 	if err != nil {
 		return KeyRecord{}, err
 	}
-	record, err := keyRecordFromMap(resp)
-	if err != nil {
-		return KeyRecord{}, err
-	}
+	record := keyRecordFromMap(resp)
 	if record.APIKey == "" {
 		record.APIKey = apiKey
 	}
@@ -141,10 +151,7 @@ func (c *Client) UpdateKeyBudget(ctx context.Context, apiKey string, budget floa
 	if err != nil {
 		return KeyRecord{}, err
 	}
-	record, err := keyRecordFromMap(resp)
-	if err != nil {
-		return KeyRecord{}, err
-	}
+	record := keyRecordFromMap(resp)
 	if record.APIKey == "" {
 		record.APIKey = apiKey
 	}
@@ -152,6 +159,57 @@ func (c *Client) UpdateKeyBudget(ctx context.Context, apiKey string, budget floa
 		record.MaxBudget = budget
 	}
 	return record, nil
+}
+
+func (c *Client) ListRecentCallsByKey(ctx context.Context, apiKey string, limit int) ([]CallRecord, error) {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return nil, errors.New("api key is required")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	q := url.Values{}
+	q.Set("api_key", apiKey)
+	q.Set("key", apiKey)
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	candidates := []string{
+		"/spend/logs?" + q.Encode(),
+		"/global/spend/logs?" + q.Encode(),
+		"/spend_logs?" + q.Encode(),
+	}
+	var lastErr error
+	sawNotFound := false
+	for _, path := range candidates {
+		data, err := c.doJSON(ctx, http.MethodGet, path, nil)
+		if err != nil {
+			if isNotFoundError(err) {
+				sawNotFound = true
+				continue
+			}
+			lastErr = err
+			continue
+		}
+		records := callRecordsFromMap(data)
+		if len(records) == 0 {
+			continue
+		}
+		if len(records) > limit {
+			records = records[:limit]
+		}
+		return records, nil
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	if sawNotFound {
+		return []CallRecord{}, nil
+	}
+	return []CallRecord{}, nil
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, payload any) (map[string]any, error) {
@@ -194,9 +252,17 @@ func (c *Client) doJSON(ctx context.Context, method, path string, payload any) (
 	if len(raw) == 0 {
 		return map[string]any{}, nil
 	}
-	var data map[string]any
-	if err := json.Unmarshal(raw, &data); err != nil {
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf("decode litellm response failed: %w", err)
+	}
+	data, ok := value.(map[string]any)
+	if !ok {
+		// Some LiteLLM endpoints return bare arrays.
+		if list, ok := value.([]any); ok {
+			return map[string]any{"data": list}, nil
+		}
+		return nil, fmt.Errorf("decode litellm response failed: unexpected json root type %T", value)
 	}
 	if nested, ok := asMap(data["data"]); ok {
 		return nested, nil
@@ -207,7 +273,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, payload any) (
 	return data, nil
 }
 
-func keyRecordFromMap(m map[string]any) (KeyRecord, error) {
+func keyRecordFromMap(m map[string]any) KeyRecord {
 	apiKey := firstString(m,
 		"key",
 		"api_key",
@@ -232,13 +298,10 @@ func keyRecordFromMap(m map[string]any) (KeyRecord, error) {
 		}
 	}
 
-	if apiKey == "" {
-		return KeyRecord{}, errors.New("litellm response missing api key")
-	}
 	budget, _ := firstNumber(m, "max_budget", "budget", "maxBudget")
 	spend, _ := firstNumber(m, "spend", "spend_used", "current_spend", "total_spend")
 	alias := firstString(m, "key_alias", "alias", "name")
-	return KeyRecord{APIKey: apiKey, KeyAlias: alias, MaxBudget: budget, Spend: spend}, nil
+	return KeyRecord{APIKey: apiKey, KeyAlias: alias, MaxBudget: budget, Spend: spend}
 }
 
 func firstString(m map[string]any, keys ...string) string {
@@ -307,4 +370,98 @@ func isAlreadyExistsError(err error) bool {
 		strings.Contains(msg, "duplicate") ||
 		strings.Contains(msg, "conflict") ||
 		strings.Contains(msg, "409")
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "404") || strings.Contains(msg, "not found")
+}
+
+func callRecordsFromMap(m map[string]any) []CallRecord {
+	items := make([]CallRecord, 0)
+	candidates := []string{"data", "items", "logs", "spend_logs"}
+	for _, key := range candidates {
+		value, ok := m[key]
+		if !ok {
+			continue
+		}
+		rawList, ok := value.([]any)
+		if !ok {
+			continue
+		}
+		for _, raw := range rawList {
+			entry, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			record := CallRecord{
+				At:               parseTime(entry),
+				Model:            firstNonEmptyString(firstString(entry, "model", "model_name", "requested_model", "model_group"), nestedString(entry, "metadata", "model")),
+				PromptTokens:     int64(firstNumberOrZero(entry, "prompt_tokens", "promptTokens", "input_tokens")),
+				CompletionTokens: int64(firstNumberOrZero(entry, "completion_tokens", "completionTokens", "output_tokens")),
+				TotalTokens:      int64(firstNumberOrZero(entry, "total_tokens", "totalTokens", "tokens")),
+				Cost:             firstNumberOrZero(entry, "spend", "cost", "response_cost"),
+			}
+			if record.TotalTokens == 0 {
+				record.TotalTokens = record.PromptTokens + record.CompletionTokens
+			}
+			items = append(items, record)
+		}
+	}
+	return items
+}
+
+func parseTime(m map[string]any) time.Time {
+	for _, key := range []string{"start_time", "created_at", "created", "timestamp"} {
+		value, ok := m[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch t := value.(type) {
+		case string:
+			if ts, err := time.Parse(time.RFC3339, strings.TrimSpace(t)); err == nil {
+				return ts
+			}
+			if ts, err := time.Parse("2006-01-02T15:04:05.000000Z", strings.TrimSpace(t)); err == nil {
+				return ts
+			}
+		case float64:
+			return time.Unix(int64(t), 0).UTC()
+		case int64:
+			return time.Unix(t, 0).UTC()
+		}
+	}
+	return time.Time{}
+}
+
+func firstNumberOrZero(m map[string]any, keys ...string) float64 {
+	value, ok := firstNumber(m, keys...)
+	if !ok {
+		return 0
+	}
+	return value
+}
+
+func nestedString(m map[string]any, objectKey, fieldKey string) string {
+	raw, ok := m[objectKey]
+	if !ok || raw == nil {
+		return ""
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return ""
+	}
+	return firstString(obj, fieldKey)
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

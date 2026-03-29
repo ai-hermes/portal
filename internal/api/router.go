@@ -58,9 +58,13 @@ func NewRouter(deps Dependencies) http.Handler {
 	protected.POST("/policies/relationships", r.handleWriteRelationships)
 	protected.GET("/audit/events", r.handleAuditQuery)
 	protected.GET("/tenants/:tenant_id/members", r.handleTenantMembers)
+	protected.GET("/litellm/me/credit", r.handleLiteLLMMyCredit)
+	protected.GET("/litellm/me/calls", r.handleLiteLLMMyCalls)
 	protected.GET("/admin/litellm/credits/:tenant_id/:user_id", r.handleLiteLLMCreditGet)
 	protected.POST("/admin/litellm/credits/adjust", r.handleLiteLLMCreditAdjust)
 	protected.GET("/admin/litellm/events", r.handleLiteLLMCreditEvents)
+	protected.GET("/admin/litellm/calls/:tenant_id/:user_id", r.handleLiteLLMRecentCalls)
+	protected.GET("/admin/litellm/access", r.handleLiteLLMAccess)
 
 	return engine
 }
@@ -552,6 +556,95 @@ func (r *Router) handleLiteLLMCreditEvents(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, map[string]any{"items": events, "limit": limit, "offset": offset})
+}
+
+func (r *Router) handleLiteLLMMyCredit(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+	snapshot, err := r.deps.LiteLLMCredit.GetMyCredit(c.Request.Context(), principal)
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, snapshot)
+}
+
+func (r *Router) handleLiteLLMMyCalls(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil {
+			limit = value
+		}
+	}
+	items, err := r.deps.LiteLLMCredit.ListMyRecentCalls(c.Request.Context(), principal, limit)
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"items": items, "limit": limit})
+}
+
+func (r *Router) handleLiteLLMRecentCalls(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil {
+			limit = value
+		}
+	}
+	items, err := r.deps.LiteLLMCredit.ListRecentCalls(
+		c.Request.Context(),
+		principal,
+		c.Param("tenant_id"),
+		c.Param("user_id"),
+		limit,
+	)
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"items": items, "limit": limit})
+}
+
+func (r *Router) handleLiteLLMAccess(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusOK, map[string]any{"can_manage": false, "service_available": false})
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{
+		"can_manage":        r.deps.LiteLLMCredit.IsPlatformAdmin(principal),
+		"service_available": true,
+	})
 }
 
 func (r *Router) writeLiteLLMCreditError(c *gin.Context, err error) {

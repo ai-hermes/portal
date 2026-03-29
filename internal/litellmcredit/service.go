@@ -102,11 +102,23 @@ func (s *Service) IsPlatformAdmin(principal identity.Principal) bool {
 type CreditSnapshot struct {
 	TenantID        string    `json:"tenant_id"`
 	UserID          string    `json:"user_id"`
+	APIKey          string    `json:"api_key,omitempty"`
+	KeyAlias        string    `json:"key_alias,omitempty"`
+	LiteLLMUserID   string    `json:"litellm_user_id,omitempty"`
 	BudgetTotal     float64   `json:"budget_total"`
 	SpendUsed       float64   `json:"spend_used"`
 	BudgetRemaining float64   `json:"budget_remaining"`
 	Unit            string    `json:"unit"`
 	LastSyncedAt    time.Time `json:"last_synced_at"`
+}
+
+type RecentCall struct {
+	At               time.Time `json:"at"`
+	Model            string    `json:"model"`
+	PromptTokens     int64     `json:"prompt_tokens"`
+	CompletionTokens int64     `json:"completion_tokens"`
+	TotalTokens      int64     `json:"total_tokens"`
+	Cost             float64   `json:"cost"`
 }
 
 type AdjustInput struct {
@@ -181,6 +193,17 @@ func (s *Service) GetUserCredit(ctx context.Context, actor identity.Principal, t
 	if !s.IsPlatformAdmin(actor) {
 		return CreditSnapshot{}, apiError(403, "insufficient_role", "platform admin role required")
 	}
+	return s.getCreditByTenantUser(ctx, tenantID, userID)
+}
+
+func (s *Service) GetMyCredit(ctx context.Context, principal identity.Principal) (CreditSnapshot, error) {
+	if strings.TrimSpace(principal.TenantID) == "" || strings.TrimSpace(principal.UserID) == "" {
+		return CreditSnapshot{}, apiError(401, "invalid_principal", "invalid principal")
+	}
+	return s.getCreditByTenantUser(ctx, principal.TenantID, principal.UserID)
+}
+
+func (s *Service) getCreditByTenantUser(ctx context.Context, tenantID, userID string) (CreditSnapshot, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	userID = strings.TrimSpace(userID)
 	if tenantID == "" || userID == "" {
@@ -338,6 +361,58 @@ func (s *Service) ListEvents(ctx context.Context, actor identity.Principal, limi
 			Reason:       row.Reason,
 			ErrorMessage: row.ErrorMessage,
 			CreatedAt:    row.CreatedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *Service) ListRecentCalls(ctx context.Context, actor identity.Principal, tenantID, userID string, limit int) ([]RecentCall, error) {
+	if !s.IsPlatformAdmin(actor) {
+		return nil, apiError(403, "insufficient_role", "platform admin role required")
+	}
+	return s.listRecentCallsByTenantUser(ctx, tenantID, userID, limit)
+}
+
+func (s *Service) ListMyRecentCalls(ctx context.Context, principal identity.Principal, limit int) ([]RecentCall, error) {
+	if strings.TrimSpace(principal.TenantID) == "" || strings.TrimSpace(principal.UserID) == "" {
+		return nil, apiError(401, "invalid_principal", "invalid principal")
+	}
+	return s.listRecentCallsByTenantUser(ctx, principal.TenantID, principal.UserID, limit)
+}
+
+func (s *Service) listRecentCallsByTenantUser(ctx context.Context, tenantID, userID string, limit int) ([]RecentCall, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	userID = strings.TrimSpace(userID)
+	if tenantID == "" || userID == "" {
+		return nil, apiError(400, "invalid_request", "tenant_id and user_id are required")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	email, err := s.ensureTenantUser(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	key, _, err := s.ensureUserKey(ctx, tenantID, userID, email)
+	if err != nil {
+		return nil, err
+	}
+	records, err := s.client.ListRecentCallsByKey(ctx, key.APIKey, limit)
+	if err != nil {
+		return nil, apiError(502, "litellm_error", err.Error())
+	}
+	items := make([]RecentCall, 0, len(records))
+	for _, record := range records {
+		items = append(items, RecentCall{
+			At:               record.At,
+			Model:            record.Model,
+			PromptTokens:     record.PromptTokens,
+			CompletionTokens: record.CompletionTokens,
+			TotalTokens:      record.TotalTokens,
+			Cost:             record.Cost,
 		})
 	}
 	return items, nil
@@ -515,6 +590,9 @@ func toSnapshot(row litellmUserKeyModel) CreditSnapshot {
 	return CreditSnapshot{
 		TenantID:        row.TenantID,
 		UserID:          row.UserID,
+		APIKey:          row.APIKey,
+		KeyAlias:        row.KeyAlias,
+		LiteLLMUserID:   buildLiteLLMUserID(row.TenantID, row.UserID),
 		BudgetTotal:     row.LastBudgetTotal,
 		SpendUsed:       row.LastSpendUsed,
 		BudgetRemaining: remaining,
