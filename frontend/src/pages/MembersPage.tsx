@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Card } from "../components/ui";
-import { listMembers, type Principal } from "../lib/api";
+import { getMe, listMembers, type Principal } from "../lib/api";
 
 export function MembersPage() {
   const [items, setItems] = useState<Principal[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    listMembers("tenant-acme")
+    getMe()
+      .then((me) => listMembers(me.tenant_id))
       .then((res) => setItems(res.items))
       .catch((e) => setError((e as Error).message));
   }, []);

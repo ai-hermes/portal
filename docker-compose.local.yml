@@ -1,28 +1,4 @@
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      args:
-        IMAGE_REGISTRY: "${IMAGE_REGISTRY:-docker.io}"
-    environment:
-      PORT: ":8080"
-      AUTHZ_PROVIDER: "${AUTHZ_PROVIDER:-memory}"
-      OPENFGA_API_URL: "${OPENFGA_API_URL:-http://openfga:8080}"
-      OPENFGA_STORE_ID: "${OPENFGA_STORE_ID:-}"
-      DATABASE_URL: "${DATABASE_URL:-postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable}"
-      JWT_SIGNING_KEY: "${JWT_SIGNING_KEY:-dev-only-change-me}"
-    ports:
-      - "8080:8080"
-    depends_on:
-      openfga:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   postgres:
     image: "${IMAGE_REGISTRY:-docker.io}/postgres:16-alpine"
     environment:
