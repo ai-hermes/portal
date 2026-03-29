@@ -95,12 +95,10 @@ jobs:
 
             echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | docker login "${{ secrets.ALIYUN_ACR_REGISTRY }}" -u "${{ secrets.ALIYUN_ACR_USERNAME }}" --password-stdin
 
-            IMAGE_REGISTRY="${{ secrets.ALIYUN_ACR_REGISTRY }}/${{ secrets.ALIYUN_ACR_NAMESPACE }}"
-
             if [ ! -f .env ]; then
               {
                 printf 'BACKEND_IMAGE=%s\n' "${{ steps.vars.outputs.image }}"
-                printf 'IMAGE_REGISTRY=%s\n' "${IMAGE_REGISTRY}"
+                printf 'IMAGE_REGISTRY=%s\n' "${{ secrets.IMAGE_REGISTRY }}"
                 printf 'HOST_PORT=8080\n'
                 printf 'AUTHZ_PROVIDER=memory\n'
                 printf 'OPENFGA_API_URL=\n'
@@ -113,9 +111,9 @@ jobs:
                 printf '\nBACKEND_IMAGE=%s\n' "${{ steps.vars.outputs.image }}" >> .env
               fi
               if grep -q '^IMAGE_REGISTRY=' .env; then
-                sed -i.bak "s|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${IMAGE_REGISTRY}|" .env
+                sed -i.bak "s|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${{ secrets.IMAGE_REGISTRY }}|" .env
               else
-                printf '\nIMAGE_REGISTRY=%s\n' "${IMAGE_REGISTRY}" >> .env
+                printf '\nIMAGE_REGISTRY=%s\n' "${{ secrets.IMAGE_REGISTRY }}" >> .env
               fi
             fi
 
