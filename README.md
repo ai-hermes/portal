@@ -21,8 +21,8 @@ Backend requires Postgres and `JWT_SIGNING_KEY`; schema is auto-migrated on star
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Frontend runs on `:5173` and proxies `/api` to `:8080`.
@@ -31,7 +31,7 @@ To build production static assets for Go server hosting:
 
 ```bash
 cd frontend
-npm run build
+pnpm run build
 ```
 
 ## Docker quick start
@@ -81,7 +81,7 @@ Then start apps on host:
 
 ```bash
 go run ./cmd/server
-cd frontend && npm install && npm run dev
+cd frontend && pnpm install && pnpm run dev
 ```
 
 Backend API runs at `http://localhost:8080`, frontend dev server at `http://localhost:5173`, OpenFGA at `http://localhost:8081`.
@@ -129,6 +129,7 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 ## Runtime environment variables
 
 - `PORT` default `:8080`
+- `DOTENV_FILES` dotenv files load order (comma-separated), default `.env.local,.env`
 - `DATABASE_URL` Postgres DSN for account data
 - `JWT_SIGNING_KEY` HMAC signing key for access token
 - `ACCESS_TOKEN_TTL` default `15m`

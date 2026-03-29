@@ -2,10 +2,10 @@ ARG IMAGE_REGISTRY=docker.io
 
 FROM ${IMAGE_REGISTRY}/node:22-alpine AS frontend-builder
 WORKDIR /web
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY frontend/ ./
-RUN npm run build
+RUN pnpm run build
 
 FROM ${IMAGE_REGISTRY}/golang:1.25-alpine AS builder
 WORKDIR /src
