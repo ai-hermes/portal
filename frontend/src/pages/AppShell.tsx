@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { getMe, getToken, logout, type Principal } from "../lib/api";
 import { AuditPage } from "./AuditPage";
+import { LiteLLMCreditsPage } from "./LiteLLMCreditsPage";
 import { MembersPage } from "./MembersPage";
 import { PolicyPage } from "./PolicyPage";
 
@@ -38,12 +39,14 @@ export function AppShell() {
           <Link to="/app">Members</Link>
           <Link to="/app/policy">Policy</Link>
           <Link to="/app/audit">Audit</Link>
+          <Link to="/app/litellm-credits">LiteLLM Credits</Link>
         </nav>
       </header>
       <Routes>
         <Route path="/" element={<MembersPage />} />
         <Route path="/policy" element={<PolicyPage />} />
         <Route path="/audit" element={<AuditPage />} />
+        <Route path="/litellm-credits" element={<LiteLLMCreditsPage />} />
       </Routes>
     </div>
   );

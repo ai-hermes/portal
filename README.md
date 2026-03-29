@@ -119,6 +119,9 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 - `POST /api/v1/permissions/check`
 - `POST /api/v1/policies/relationships`
 - `GET /api/v1/audit/events`
+- `GET /api/v1/admin/litellm/credits/:tenant_id/:user_id`
+- `POST /api/v1/admin/litellm/credits/adjust`
+- `GET /api/v1/admin/litellm/events`
 
 ## Production integration path
 
@@ -141,6 +144,10 @@ This prints a `OPENFGA_STORE_ID=<value>`; export it and start backend with `AUTH
 - `SMS_MAX_PER_PHONE` default `5`
 - `SMS_MAX_PER_IP` default `20`
 - `PASSWORD_RESET_TTL` default `15m`
+- `LITELLM_BASE_URL` LiteLLM service base URL
+- `LITELLM_MASTER_KEY` LiteLLM master/admin key
+- `LITELLM_HTTP_TIMEOUT` LiteLLM API timeout, default `5s`
+- `PLATFORM_ADMIN_EMAILS` comma-separated emails allowed to manage LiteLLM credits
 - `SMS_PROVIDER` default `log` (`aliyun` to enable Alibaba Cloud SMS provider)
 - `ALIBABA_CLOUD_REGION_ID` default `cn-hangzhou`
 - `ALIBABA_CLOUD_ACCESS_KEY_ID` required when `SMS_PROVIDER=aliyun`

@@ -15,6 +15,32 @@ export type AuditEvent = {
   at: string;
 };
 
+export type LiteLLMCreditSnapshot = {
+  tenant_id: string;
+  user_id: string;
+  budget_total: number;
+  spend_used: number;
+  budget_remaining: number;
+  unit: string;
+  last_synced_at: string;
+};
+
+export type LiteLLMCreditEvent = {
+  id: number;
+  tenant_id: string;
+  user_id: string;
+  actor_user_id: string;
+  actor_email: string;
+  mode: "set" | "delta";
+  amount: number;
+  before_budget: number;
+  after_budget: number;
+  result: string;
+  reason: string;
+  error_message?: string;
+  created_at: string;
+};
+
 type TokenPair = {
   access_token: string;
   token_type: string;
@@ -205,4 +231,26 @@ export function writeRelationships(tuples: Array<{ subject: string; relation: st
 export function listAudit(action?: string) {
   const q = action ? `?action=${encodeURIComponent(action)}` : "";
   return apiFetch<{ items: AuditEvent[] }>(`${apiBaseURL}/api/v1/audit/events${q}`);
+}
+
+export function getLiteLLMCredit(tenantID: string, userID: string) {
+  return apiFetch<LiteLLMCreditSnapshot>(`${apiBaseURL}/api/v1/admin/litellm/credits/${encodeURIComponent(tenantID)}/${encodeURIComponent(userID)}`);
+}
+
+export function adjustLiteLLMCredit(input: {
+  tenant_id: string;
+  user_id: string;
+  mode: "set" | "delta";
+  amount: number;
+  reason: string;
+}) {
+  return apiFetch<LiteLLMCreditSnapshot>(`${apiBaseURL}/api/v1/admin/litellm/credits/adjust`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function listLiteLLMCreditEvents(limit = 20, offset = 0) {
+  const q = `?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
+  return apiFetch<{ items: LiteLLMCreditEvent[]; limit: number; offset: number }>(`${apiBaseURL}/api/v1/admin/litellm/events${q}`);
 }

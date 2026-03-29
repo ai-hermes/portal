@@ -2,17 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/warjiang/portal/internal/api"
 	"github.com/warjiang/portal/internal/audit"
 	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
+	"github.com/warjiang/portal/internal/litellm"
+	"github.com/warjiang/portal/internal/litellmcredit"
 	"github.com/warjiang/portal/internal/providers/auditmem"
 	"github.com/warjiang/portal/internal/providers/authzmem"
 	"github.com/warjiang/portal/internal/providers/authzopenfga"
@@ -23,6 +29,8 @@ import (
 )
 
 func main() {
+	loadDotenvFiles()
+
 	db, err := gorm.Open(postgres.Open(envOr("DATABASE_URL", "postgres://openfga:openfga@localhost:5432/openfga?sslmode=disable")), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("open database failed: %v", err)
@@ -60,11 +68,13 @@ func main() {
 	}
 
 	authzSvc := authz.NewService(authzProvider)
+	liteLLMCreditSvc := buildLiteLLMCreditService(db)
 
 	router := api.NewRouter(api.Dependencies{
-		Authn: authnSvc,
-		Authz: authzSvc,
-		Audit: auditSvc,
+		Authn:         authnSvc,
+		Authz:         authzSvc,
+		Audit:         auditSvc,
+		LiteLLMCredit: liteLLMCreditSvc,
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
 	handler := api.NewAppHandler(router, webDir)
@@ -87,6 +97,111 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server failed: %v", err)
 	}
+}
+
+func buildLiteLLMCreditService(db *gorm.DB) *litellmcredit.Service {
+	baseURL := strings.TrimSpace(os.Getenv("LITELLM_BASE_URL"))
+	masterKey := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY"))
+	if baseURL == "" || masterKey == "" {
+		log.Printf("litellm credit service disabled: missing LITELLM_BASE_URL or LITELLM_MASTER_KEY")
+		return nil
+	}
+
+	client, err := litellm.NewClient(litellm.Config{
+		BaseURL:   baseURL,
+		MasterKey: masterKey,
+		HTTPClient: &http.Client{
+			Timeout: parseDurationOr("LITELLM_HTTP_TIMEOUT", 5*time.Second),
+		},
+	})
+	if err != nil {
+		log.Printf("litellm credit service disabled: create client failed: %v", err)
+		return nil
+	}
+
+	service, err := litellmcredit.NewService(db, client, litellmcredit.Config{
+		PlatformAdminEmails: litellmcredit.ParsePlatformAdminEmails(os.Getenv("PLATFORM_ADMIN_EMAILS")),
+	})
+	if err != nil {
+		log.Printf("litellm credit service disabled: create service failed: %v", err)
+		return nil
+	}
+	log.Printf("litellm credit service enabled")
+	return service
+}
+
+func loadDotenvFiles() {
+	files := dotenvFiles()
+	log.Printf("dotenv load start: files=%s", strings.Join(files, ","))
+
+	totalSet := 0
+	totalSkipped := 0
+	for _, file := range files {
+		values, err := godotenv.Read(file)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				log.Printf("dotenv file missing: %s (skipped)", file)
+				continue
+			}
+			log.Printf("dotenv read failed: file=%s err=%v (skipped)", file, err)
+			continue
+		}
+
+		keys := make([]string, 0, len(values))
+		setCount := 0
+		skippedCount := 0
+		for key, value := range values {
+			keys = append(keys, key)
+			if _, exists := os.LookupEnv(key); exists {
+				skippedCount++
+				continue
+			}
+			if err := os.Setenv(key, value); err != nil {
+				log.Printf("dotenv set failed: file=%s key=%s err=%v", file, key, err)
+				continue
+			}
+			setCount++
+		}
+
+		sort.Strings(keys)
+		totalSet += setCount
+		totalSkipped += skippedCount
+		log.Printf(
+			"dotenv loaded: file=%s parsed=%d set=%d skipped=%d keys=%s",
+			file,
+			len(values),
+			setCount,
+			skippedCount,
+			strings.Join(keys, ","),
+		)
+	}
+
+	log.Printf("dotenv load done: set=%d skipped=%d", totalSet, totalSkipped)
+}
+
+func dotenvFiles() []string {
+	raw := strings.TrimSpace(os.Getenv("DOTENV_FILES"))
+	if raw == "" {
+		return []string{".env.local", ".env"}
+	}
+	parts := strings.Split(raw, ",")
+	files := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		file := strings.TrimSpace(part)
+		if file == "" {
+			continue
+		}
+		if _, ok := seen[file]; ok {
+			continue
+		}
+		seen[file] = struct{}{}
+		files = append(files, file)
+	}
+	if len(files) == 0 {
+		return []string{".env.local", ".env"}
+	}
+	return files
 }
 
 func envOr(key, fallback string) string {

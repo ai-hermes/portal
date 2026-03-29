@@ -82,6 +82,37 @@ func Migrate(ctx context.Context, db *gorm.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets (token_hash)`,
 		`CREATE INDEX IF NOT EXISTS idx_password_resets_expires_at ON password_resets (expires_at)`,
+		`CREATE TABLE IF NOT EXISTS litellm_user_keys (
+			id TEXT PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			api_key TEXT NOT NULL UNIQUE,
+			key_alias TEXT NOT NULL DEFAULT '',
+			last_budget_total DOUBLE PRECISION NOT NULL DEFAULT 0,
+			last_spend_used DOUBLE PRECISION NOT NULL DEFAULT 0,
+			last_synced_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL,
+			UNIQUE (tenant_id, user_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_litellm_user_keys_tenant_id ON litellm_user_keys (tenant_id)`,
+		`CREATE TABLE IF NOT EXISTS litellm_credit_events (
+			id BIGSERIAL PRIMARY KEY,
+			tenant_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			actor_user_id TEXT NOT NULL,
+			actor_email TEXT NOT NULL DEFAULT '',
+			mode TEXT NOT NULL,
+			amount DOUBLE PRECISION NOT NULL,
+			before_budget DOUBLE PRECISION NOT NULL DEFAULT 0,
+			after_budget DOUBLE PRECISION NOT NULL DEFAULT 0,
+			result TEXT NOT NULL,
+			reason TEXT NOT NULL DEFAULT '',
+			error_message TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMPTZ NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_litellm_credit_events_tenant_user_time ON litellm_credit_events (tenant_id, user_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_litellm_credit_events_created_at ON litellm_credit_events (created_at DESC)`,
 	}
 
 	for _, stmt := range stmts {

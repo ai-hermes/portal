@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,13 +11,15 @@ import (
 	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
 	"github.com/warjiang/portal/internal/identity"
+	"github.com/warjiang/portal/internal/litellmcredit"
 	"github.com/warjiang/portal/internal/models"
 )
 
 type Dependencies struct {
-	Authn *authn.Service
-	Authz *authz.Service
-	Audit *audit.Service
+	Authn         *authn.Service
+	Authz         *authz.Service
+	Audit         *audit.Service
+	LiteLLMCredit *litellmcredit.Service
 }
 
 type Router struct {
@@ -55,6 +58,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	protected.POST("/policies/relationships", r.handleWriteRelationships)
 	protected.GET("/audit/events", r.handleAuditQuery)
 	protected.GET("/tenants/:tenant_id/members", r.handleTenantMembers)
+	protected.GET("/admin/litellm/credits/:tenant_id/:user_id", r.handleLiteLLMCreditGet)
+	protected.POST("/admin/litellm/credits/adjust", r.handleLiteLLMCreditAdjust)
+	protected.GET("/admin/litellm/events", r.handleLiteLLMCreditEvents)
 
 	return engine
 }
@@ -453,6 +459,117 @@ func (r *Router) handleAuditQuery(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, map[string]any{"items": events})
+}
+
+type liteLLMCreditAdjustRequest struct {
+	TenantID string  `json:"tenant_id"`
+	UserID   string  `json:"user_id"`
+	Mode     string  `json:"mode"`
+	Amount   float64 `json:"amount"`
+	Reason   string  `json:"reason"`
+}
+
+func (r *Router) handleLiteLLMCreditGet(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+
+	snapshot, err := r.deps.LiteLLMCredit.GetUserCredit(
+		c.Request.Context(),
+		principal,
+		c.Param("tenant_id"),
+		c.Param("user_id"),
+	)
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, snapshot)
+}
+
+func (r *Router) handleLiteLLMCreditAdjust(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+
+	var body liteLLMCreditAdjustRequest
+	if err := decodeJSON(c, &body); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	snapshot, err := r.deps.LiteLLMCredit.AdjustUserCredit(c.Request.Context(), principal, litellmcredit.AdjustInput{
+		TenantID: body.TenantID,
+		UserID:   body.UserID,
+		Mode:     body.Mode,
+		Amount:   body.Amount,
+		Reason:   body.Reason,
+	})
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, snapshot)
+}
+
+func (r *Router) handleLiteLLMCreditEvents(c *gin.Context) {
+	principal, ok := principalFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLMCredit == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "litellm credit service is unavailable"})
+		return
+	}
+
+	limit := 50
+	offset := 0
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil {
+			limit = value
+		}
+	}
+	if raw := strings.TrimSpace(c.Query("offset")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil {
+			offset = value
+		}
+	}
+	events, err := r.deps.LiteLLMCredit.ListEvents(c.Request.Context(), principal, limit, offset)
+	if err != nil {
+		r.writeLiteLLMCreditError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"items": events, "limit": limit, "offset": offset})
+}
+
+func (r *Router) writeLiteLLMCreditError(c *gin.Context, err error) {
+	if ae, ok := litellmcredit.AsAPIError(err); ok {
+		c.JSON(ae.Status, map[string]any{
+			"error": map[string]string{
+				"code":    ae.Code,
+				"message": ae.Message,
+			},
+		})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, map[string]any{
+		"error": map[string]string{
+			"code":    "internal_error",
+			"message": "internal server error",
+		},
+	})
 }
 
 func decodeJSON(c *gin.Context, dst any) error {
