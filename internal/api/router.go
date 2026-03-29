@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/warjiang/portal/docs"
 	"github.com/warjiang/portal/internal/audit"
 	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
@@ -16,10 +19,11 @@ import (
 )
 
 type Dependencies struct {
-	Authn         *authn.Service
-	Authz         *authz.Service
-	Audit         *audit.Service
-	LiteLLMCredit *litellmcredit.Service
+	Authn          *authn.Service
+	Authz          *authz.Service
+	Audit          *audit.Service
+	LiteLLMCredit  *litellmcredit.Service
+	SwaggerEnabled bool
 }
 
 type Router struct {
@@ -38,6 +42,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	})
 
 	engine.GET("/healthz", r.handleHealth)
+	if deps.SwaggerEnabled {
+		engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	auth := engine.Group("/api/v1/auth")
 	auth.POST("/register", r.handleRegister)
@@ -69,6 +76,13 @@ func NewRouter(deps Dependencies) http.Handler {
 	return engine
 }
 
+// handleHealth godoc
+// @Summary Health check
+// @Description Returns service health status.
+// @Tags system
+// @Produce json
+// @Success 200 {object} statusResponse
+// @Router /healthz [get]
 func (r *Router) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -79,6 +93,17 @@ type registerRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
+// handleRegister godoc
+// @Summary Register user by email
+// @Description Registers a new user and creates a tenant.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body registerRequest true "Register payload"
+// @Success 201 {object} authn.RegisterResult
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/register [post]
 func (r *Router) handleRegister(c *gin.Context) {
 	var body registerRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -103,6 +128,17 @@ type verifyEmailRequest struct {
 	Code  string `json:"code"`
 }
 
+// handleVerifyEmail godoc
+// @Summary Verify email
+// @Description Verifies email with the one-time code.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body verifyEmailRequest true "Verify email payload"
+// @Success 200 {object} verifiedResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/verify-email [post]
 func (r *Router) handleVerifyEmail(c *gin.Context) {
 	var body verifyEmailRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -127,6 +163,18 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+// handleLogin godoc
+// @Summary Login
+// @Description Logs in by account(email/phone) and password.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body loginRequest true "Login payload"
+// @Success 200 {object} authn.TokenPair
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} apiErrorResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/login [post]
 func (r *Router) handleLogin(c *gin.Context) {
 	var body loginRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -151,6 +199,18 @@ type sendSMSCodeRequest struct {
 	Purpose string `json:"purpose"`
 }
 
+// handleSendSMSCode godoc
+// @Summary Send SMS code
+// @Description Sends an SMS verification code for a given purpose.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body sendSMSCodeRequest true "Send SMS code payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 429 {object} apiErrorResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/sms/send-code [post]
 func (r *Router) handleSendSMSCode(c *gin.Context) {
 	var body sendSMSCodeRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -178,6 +238,17 @@ type registerByPhoneRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
+// handleRegisterByPhone godoc
+// @Summary Register user by phone
+// @Description Registers a new user with phone and SMS code.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body registerByPhoneRequest true "Register by phone payload"
+// @Success 201 {object} authn.RegisterResult
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/register/phone [post]
 func (r *Router) handleRegisterByPhone(c *gin.Context) {
 	var body registerByPhoneRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -202,6 +273,18 @@ type refreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// handleRefresh godoc
+// @Summary Refresh token pair
+// @Description Exchanges refresh token for a new access/refresh pair.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body refreshRequest true "Refresh payload"
+// @Success 200 {object} authn.TokenPair
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} apiErrorResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/refresh [post]
 func (r *Router) handleRefresh(c *gin.Context) {
 	var body refreshRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -217,6 +300,17 @@ func (r *Router) handleRefresh(c *gin.Context) {
 	c.JSON(http.StatusOK, pair)
 }
 
+// handleLogout godoc
+// @Summary Logout
+// @Description Revokes the given refresh token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body refreshRequest true "Logout payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/logout [post]
 func (r *Router) handleLogout(c *gin.Context) {
 	var body refreshRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -235,6 +329,17 @@ type forgotPasswordRequest struct {
 	Email string `json:"email"`
 }
 
+// handleForgotPassword godoc
+// @Summary Request password reset
+// @Description Sends password reset token to the email.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body forgotPasswordRequest true "Forgot password payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/password/forgot [post]
 func (r *Router) handleForgotPassword(c *gin.Context) {
 	var body forgotPasswordRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -254,6 +359,17 @@ type resetPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+// handleResetPassword godoc
+// @Summary Reset password
+// @Description Resets password with password-reset token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body resetPasswordRequest true "Reset password payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/password/reset [post]
 func (r *Router) handleResetPassword(c *gin.Context) {
 	var body resetPasswordRequest
 	if err := decodeJSON(c, &body); err != nil {
@@ -273,6 +389,20 @@ type changePasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+// handleChangePassword godoc
+// @Summary Change password
+// @Description Changes current user's password.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param request body changePasswordRequest true "Change password payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} apiErrorResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/password/change [post]
 func (r *Router) handleChangePassword(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -330,6 +460,17 @@ func (r *Router) withAuth() gin.HandlerFunc {
 	}
 }
 
+// handleMe godoc
+// @Summary Current principal
+// @Description Returns current authenticated principal.
+// @Tags user
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Success 200 {object} identity.Principal
+// @Failure 401 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/me [get]
 func (r *Router) handleMe(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -339,6 +480,20 @@ func (r *Router) handleMe(c *gin.Context) {
 	c.JSON(http.StatusOK, principal)
 }
 
+// handleTenantMembers godoc
+// @Summary List tenant members
+// @Description Lists members of the requested tenant.
+// @Tags user
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param tenant_id path string true "Tenant ID"
+// @Success 200 {object} tenantMembersResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} errorMessageResponse
+// @Failure 500 {object} errorMessageResponse
+// @Router /api/v1/tenants/{tenant_id}/members [get]
 func (r *Router) handleTenantMembers(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -370,6 +525,20 @@ type checkPermissionRequest struct {
 	Object   string `json:"object"`
 }
 
+// handlePermissionCheck godoc
+// @Summary Check permission
+// @Description Checks whether a subject has relation on object.
+// @Tags authz
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param request body checkPermissionRequest true "Permission check payload"
+// @Success 200 {object} allowedResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 500 {object} errorMessageResponse
+// @Router /api/v1/permissions/check [post]
 func (r *Router) handlePermissionCheck(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -408,6 +577,21 @@ type writeRelationshipRequest struct {
 	Tuples []models.PolicyTuple `json:"tuples"`
 }
 
+// handleWriteRelationships godoc
+// @Summary Write policy relationships
+// @Description Writes relationship tuples (tenant_admin only).
+// @Tags authz
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param request body writeRelationshipRequest true "Relationship tuples payload"
+// @Success 200 {object} writtenResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} errorMessageResponse
+// @Failure 500 {object} errorMessageResponse
+// @Router /api/v1/policies/relationships [post]
 func (r *Router) handleWriteRelationships(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -444,6 +628,20 @@ func (r *Router) handleWriteRelationships(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]any{"written": len(body.Tuples)})
 }
 
+// handleAuditQuery godoc
+// @Summary Query audit events
+// @Description Queries tenant audit events with optional filters.
+// @Tags audit
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param actor query string false "Actor user id"
+// @Param action query string false "Action"
+// @Param resource query string false "Resource"
+// @Success 200 {object} auditEventsResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 500 {object} errorMessageResponse
+// @Router /api/v1/audit/events [get]
 func (r *Router) handleAuditQuery(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -473,6 +671,21 @@ type liteLLMCreditAdjustRequest struct {
 	Reason   string  `json:"reason"`
 }
 
+// handleLiteLLMCreditGet godoc
+// @Summary Get user credit (admin)
+// @Description Gets LiteLLM credit snapshot for tenant user (platform admin only).
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param tenant_id path string true "Tenant ID"
+// @Param user_id path string true "User ID"
+// @Success 200 {object} litellmcredit.CreditSnapshot
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} apiErrorResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/admin/litellm/credits/{tenant_id}/{user_id} [get]
 func (r *Router) handleLiteLLMCreditGet(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -497,6 +710,22 @@ func (r *Router) handleLiteLLMCreditGet(c *gin.Context) {
 	c.JSON(http.StatusOK, snapshot)
 }
 
+// handleLiteLLMCreditAdjust godoc
+// @Summary Adjust user credit (admin)
+// @Description Adjusts LiteLLM credit by set/delta (platform admin only).
+// @Tags litellm
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param request body liteLLMCreditAdjustRequest true "Adjust credit payload"
+// @Success 200 {object} litellmcredit.CreditSnapshot
+// @Failure 400 {object} errorMessageResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} apiErrorResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/admin/litellm/credits/adjust [post]
 func (r *Router) handleLiteLLMCreditAdjust(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -527,6 +756,21 @@ func (r *Router) handleLiteLLMCreditAdjust(c *gin.Context) {
 	c.JSON(http.StatusOK, snapshot)
 }
 
+// handleLiteLLMCreditEvents godoc
+// @Summary List credit events (admin)
+// @Description Lists LiteLLM credit adjustment events (platform admin only).
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param limit query int false "Page size"
+// @Param offset query int false "Page offset"
+// @Success 200 {object} liteLLMEventsResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} apiErrorResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/admin/litellm/events [get]
 func (r *Router) handleLiteLLMCreditEvents(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -558,6 +802,18 @@ func (r *Router) handleLiteLLMCreditEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]any{"items": events, "limit": limit, "offset": offset})
 }
 
+// handleLiteLLMMyCredit godoc
+// @Summary Get my credit
+// @Description Gets authenticated user's LiteLLM credit snapshot.
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Success 200 {object} litellmcredit.CreditSnapshot
+// @Failure 401 {object} errorMessageResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/litellm/me/credit [get]
 func (r *Router) handleLiteLLMMyCredit(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -576,6 +832,19 @@ func (r *Router) handleLiteLLMMyCredit(c *gin.Context) {
 	c.JSON(http.StatusOK, snapshot)
 }
 
+// handleLiteLLMMyCalls godoc
+// @Summary List my recent calls
+// @Description Lists recent LiteLLM calls for current user.
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param limit query int false "Max number of records"
+// @Success 200 {object} liteLLMRecentCallsResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/litellm/me/calls [get]
 func (r *Router) handleLiteLLMMyCalls(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -600,6 +869,22 @@ func (r *Router) handleLiteLLMMyCalls(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]any{"items": items, "limit": limit})
 }
 
+// handleLiteLLMRecentCalls godoc
+// @Summary List user recent calls (admin)
+// @Description Lists recent LiteLLM calls for a tenant user (platform admin only).
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Param tenant_id path string true "Tenant ID"
+// @Param user_id path string true "User ID"
+// @Param limit query int false "Max number of records"
+// @Success 200 {object} liteLLMRecentCallsResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 403 {object} apiErrorResponse
+// @Failure 503 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/admin/litellm/calls/{tenant_id}/{user_id} [get]
 func (r *Router) handleLiteLLMRecentCalls(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {
@@ -631,6 +916,17 @@ func (r *Router) handleLiteLLMRecentCalls(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]any{"items": items, "limit": limit})
 }
 
+// handleLiteLLMAccess godoc
+// @Summary LiteLLM access info
+// @Description Returns whether current user can manage LiteLLM credit.
+// @Tags litellm
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer access token"
+// @Success 200 {object} liteLLMAccessResponse
+// @Failure 401 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/admin/litellm/access [get]
 func (r *Router) handleLiteLLMAccess(c *gin.Context) {
 	principal, ok := principalFromContext(c)
 	if !ok {

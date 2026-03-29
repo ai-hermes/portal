@@ -129,13 +129,33 @@ Notes:
 - `POST /api/v1/auth/password/forgot`
 - `POST /api/v1/auth/password/reset`
 - `GET /api/v1/me`
-- `GET /api/v1/tenants/:id/members`
+- `GET /api/v1/tenants/:tenant_id/members`
 - `POST /api/v1/permissions/check`
 - `POST /api/v1/policies/relationships`
 - `GET /api/v1/audit/events`
+- `GET /api/v1/litellm/me/credit`
+- `GET /api/v1/litellm/me/calls`
 - `GET /api/v1/admin/litellm/credits/:tenant_id/:user_id`
 - `POST /api/v1/admin/litellm/credits/adjust`
 - `GET /api/v1/admin/litellm/events`
+- `GET /api/v1/admin/litellm/calls/:tenant_id/:user_id`
+- `GET /api/v1/admin/litellm/access`
+
+## Swagger docs
+
+Generate or refresh OpenAPI docs after API changes:
+
+```bash
+swag init -g cmd/server/main.go -o docs --parseInternal
+```
+
+Enable swagger route and open docs:
+
+```bash
+SWAGGER_ENABLED=true go run ./cmd/server
+```
+
+Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ## Production integration path
 
@@ -158,6 +178,7 @@ Notes:
 - `SMS_MAX_PER_PHONE` default `5`
 - `SMS_MAX_PER_IP` default `20`
 - `PASSWORD_RESET_TTL` default `15m`
+- `SWAGGER_ENABLED` default `false` (set `true` to expose `/swagger/index.html`)
 - `LITELLM_BASE_URL` LiteLLM service base URL, default `https://llmv2.spotty.com.cn/`
 - `LITELLM_MASTER_KEY` LiteLLM master/admin key
 - `LITELLM_HTTP_TIMEOUT` LiteLLM API timeout, default `5s`

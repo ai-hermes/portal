@@ -28,6 +28,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// @title AI-Hermes Portal API
+// @version 1.0
+// @description AI-Hermes Portal backend APIs.
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	loadDotenvFiles()
 
@@ -71,10 +78,11 @@ func main() {
 	authzSvc := authz.NewService(authzProvider)
 
 	router := api.NewRouter(api.Dependencies{
-		Authn:         authnSvc,
-		Authz:         authzSvc,
-		Audit:         auditSvc,
-		LiteLLMCredit: liteLLMCreditSvc,
+		Authn:          authnSvc,
+		Authz:          authzSvc,
+		Audit:          auditSvc,
+		LiteLLMCredit:  liteLLMCreditSvc,
+		SwaggerEnabled: parseBoolOr("SWAGGER_ENABLED", false),
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
 	handler := api.NewAppHandler(router, webDir)
@@ -233,6 +241,19 @@ func parseIntOr(key string, fallback int) int {
 	parsed, err := strconv.Atoi(raw)
 	if err != nil {
 		log.Printf("invalid int for %s=%s, fallback=%d", key, raw, fallback)
+		return fallback
+	}
+	return parsed
+}
+
+func parseBoolOr(key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("invalid bool for %s=%s, fallback=%t", key, raw, fallback)
 		return fallback
 	}
 	return parsed

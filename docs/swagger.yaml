@@ -1,0 +1,1146 @@
+basePath: /
+definitions:
+  api.allowedResponse:
+    properties:
+      allowed:
+        type: boolean
+    type: object
+  api.apiErrorBody:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  api.apiErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/api.apiErrorBody'
+    type: object
+  api.auditEventsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.AuditEvent'
+        type: array
+    type: object
+  api.changePasswordRequest:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    type: object
+  api.checkPermissionRequest:
+    properties:
+      object:
+        type: string
+      relation:
+        type: string
+      subject:
+        type: string
+    type: object
+  api.errorMessageResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  api.forgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  api.liteLLMAccessResponse:
+    properties:
+      can_manage:
+        type: boolean
+      service_available:
+        type: boolean
+    type: object
+  api.liteLLMCreditAdjustRequest:
+    properties:
+      amount:
+        type: number
+      mode:
+        type: string
+      reason:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  api.liteLLMEventsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.CreditEvent'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+    type: object
+  api.liteLLMRecentCallsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.RecentCall'
+        type: array
+      limit:
+        type: integer
+    type: object
+  api.loginRequest:
+    properties:
+      account:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.okResponse:
+    properties:
+      ok:
+        type: boolean
+    type: object
+  api.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  api.registerByPhoneRequest:
+    properties:
+      code:
+        type: string
+      display_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  api.registerRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.resetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
+        type: string
+    type: object
+  api.sendSMSCodeRequest:
+    properties:
+      phone:
+        type: string
+      purpose:
+        type: string
+    type: object
+  api.statusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  api.tenantMembersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/identity.Principal'
+        type: array
+    type: object
+  api.verifiedResponse:
+    properties:
+      verified:
+        type: boolean
+    type: object
+  api.verifyEmailRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    type: object
+  api.writeRelationshipRequest:
+    properties:
+      tuples:
+        items:
+          $ref: '#/definitions/models.PolicyTuple'
+        type: array
+    type: object
+  api.writtenResponse:
+    properties:
+      written:
+        type: integer
+    type: object
+  authn.RegisterResult:
+    properties:
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  authn.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  identity.Principal:
+    properties:
+      email:
+        type: string
+      role:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellmcredit.CreditEvent:
+    properties:
+      actor_email:
+        type: string
+      actor_user_id:
+        type: string
+      after_budget:
+        type: number
+      amount:
+        type: number
+      before_budget:
+        type: number
+      created_at:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: integer
+      mode:
+        type: string
+      reason:
+        type: string
+      result:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellmcredit.CreditSnapshot:
+    properties:
+      api_key:
+        type: string
+      budget_remaining:
+        type: number
+      budget_total:
+        type: number
+      key_alias:
+        type: string
+      last_synced_at:
+        type: string
+      litellm_user_id:
+        type: string
+      spend_used:
+        type: number
+      tenant_id:
+        type: string
+      unit:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellmcredit.RecentCall:
+    properties:
+      at:
+        type: string
+      completion_tokens:
+        type: integer
+      cost:
+        type: number
+      model:
+        type: string
+      prompt_tokens:
+        type: integer
+      total_tokens:
+        type: integer
+    type: object
+  models.AuditEvent:
+    properties:
+      action:
+        type: string
+      actor:
+        type: string
+      at:
+        type: string
+      id:
+        type: integer
+      ip:
+        type: string
+      resource:
+        type: string
+      result:
+        type: string
+      tenant_id:
+        type: string
+      trace_id:
+        type: string
+      user_agent:
+        type: string
+    type: object
+  models.PolicyTuple:
+    properties:
+      object:
+        type: string
+      relation:
+        type: string
+      subject:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: AI-Hermes Portal backend APIs.
+  title: AI-Hermes Portal API
+  version: "1.0"
+paths:
+  /api/v1/admin/litellm/access:
+    get:
+      description: Returns whether current user can manage LiteLLM credit.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.liteLLMAccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: LiteLLM access info
+      tags:
+      - litellm
+  /api/v1/admin/litellm/calls/{tenant_id}/{user_id}:
+    get:
+      description: Lists recent LiteLLM calls for a tenant user (platform admin only).
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: Max number of records
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.liteLLMRecentCallsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: List user recent calls (admin)
+      tags:
+      - litellm
+  /api/v1/admin/litellm/credits/{tenant_id}/{user_id}:
+    get:
+      description: Gets LiteLLM credit snapshot for tenant user (platform admin only).
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user credit (admin)
+      tags:
+      - litellm
+  /api/v1/admin/litellm/credits/adjust:
+    post:
+      consumes:
+      - application/json
+      description: Adjusts LiteLLM credit by set/delta (platform admin only).
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Adjust credit payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.liteLLMCreditAdjustRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Adjust user credit (admin)
+      tags:
+      - litellm
+  /api/v1/admin/litellm/events:
+    get:
+      description: Lists LiteLLM credit adjustment events (platform admin only).
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Page size
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.liteLLMEventsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: List credit events (admin)
+      tags:
+      - litellm
+  /api/v1/audit/events:
+    get:
+      description: Queries tenant audit events with optional filters.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Actor user id
+        in: query
+        name: actor
+        type: string
+      - description: Action
+        in: query
+        name: action
+        type: string
+      - description: Resource
+        in: query
+        name: resource
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.auditEventsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Query audit events
+      tags:
+      - audit
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Logs in by account(email/phone) and password.
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authn.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revokes the given refresh token.
+      parameters:
+      - description: Logout payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.okResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Logout
+      tags:
+      - auth
+  /api/v1/auth/password/change:
+    post:
+      consumes:
+      - application/json
+      description: Changes current user's password.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Change password payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.okResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - auth
+  /api/v1/auth/password/forgot:
+    post:
+      consumes:
+      - application/json
+      description: Sends password reset token to the email.
+      parameters:
+      - description: Forgot password payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.forgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.okResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Request password reset
+      tags:
+      - auth
+  /api/v1/auth/password/reset:
+    post:
+      consumes:
+      - application/json
+      description: Resets password with password-reset token.
+      parameters:
+      - description: Reset password payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.okResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Reset password
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges refresh token for a new access/refresh pair.
+      parameters:
+      - description: Refresh payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authn.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Refresh token pair
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user and creates a tenant.
+      parameters:
+      - description: Register payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/authn.RegisterResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Register user by email
+      tags:
+      - auth
+  /api/v1/auth/register/phone:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user with phone and SMS code.
+      parameters:
+      - description: Register by phone payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.registerByPhoneRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/authn.RegisterResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Register user by phone
+      tags:
+      - auth
+  /api/v1/auth/sms/send-code:
+    post:
+      consumes:
+      - application/json
+      description: Sends an SMS verification code for a given purpose.
+      parameters:
+      - description: Send SMS code payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.sendSMSCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.okResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Send SMS code
+      tags:
+      - auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      description: Verifies email with the one-time code.
+      parameters:
+      - description: Verify email payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.verifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.verifiedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      summary: Verify email
+      tags:
+      - auth
+  /api/v1/litellm/me/calls:
+    get:
+      description: Lists recent LiteLLM calls for current user.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Max number of records
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.liteLLMRecentCallsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: List my recent calls
+      tags:
+      - litellm
+  /api/v1/litellm/me/credit:
+    get:
+      description: Gets authenticated user's LiteLLM credit snapshot.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my credit
+      tags:
+      - litellm
+  /api/v1/me:
+    get:
+      description: Returns current authenticated principal.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/identity.Principal'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current principal
+      tags:
+      - user
+  /api/v1/permissions/check:
+    post:
+      consumes:
+      - application/json
+      description: Checks whether a subject has relation on object.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Permission check payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.checkPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.allowedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Check permission
+      tags:
+      - authz
+  /api/v1/policies/relationships:
+    post:
+      consumes:
+      - application/json
+      description: Writes relationship tuples (tenant_admin only).
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Relationship tuples payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.writeRelationshipRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.writtenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: Write policy relationships
+      tags:
+      - authz
+  /api/v1/tenants/{tenant_id}/members:
+    get:
+      description: Lists members of the requested tenant.
+      parameters:
+      - description: Bearer access token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.tenantMembersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.errorMessageResponse'
+      security:
+      - BearerAuth: []
+      summary: List tenant members
+      tags:
+      - user
+  /healthz:
+    get:
+      description: Returns service health status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.statusResponse'
+      summary: Health check
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
