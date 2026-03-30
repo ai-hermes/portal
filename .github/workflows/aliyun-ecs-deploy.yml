@@ -116,6 +116,21 @@ jobs:
           SSH_PORT="${{ secrets.ECS_PORT }}"
           if [ -z "$SSH_PORT" ]; then SSH_PORT=22; fi
 
+          export ACCESS_TOKEN_TTL="${ACCESS_TOKEN_TTL:-15m}"
+          export REFRESH_TOKEN_TTL="${REFRESH_TOKEN_TTL:-720h}"
+          export EMAIL_CODE_TTL="${EMAIL_CODE_TTL:-10m}"
+          export SMS_CODE_TTL="${SMS_CODE_TTL:-10m}"
+          export SMS_RATE_WINDOW="${SMS_RATE_WINDOW:-10m}"
+          export SMS_RESEND_INTERVAL="${SMS_RESEND_INTERVAL:-60s}"
+          export SMS_MAX_PER_PHONE="${SMS_MAX_PER_PHONE:-5}"
+          export SMS_MAX_PER_IP="${SMS_MAX_PER_IP:-20}"
+          export PASSWORD_RESET_TTL="${PASSWORD_RESET_TTL:-15m}"
+          export LITELLM_HTTP_TIMEOUT="${LITELLM_HTTP_TIMEOUT:-5s}"
+          export LITELLM_DEFAULT_USER_QUOTA="${LITELLM_DEFAULT_USER_QUOTA:-10}"
+          export AUTHZ_PROVIDER="${AUTHZ_PROVIDER:-openfga}"
+          export OPENFGA_API_URL="${OPENFGA_API_URL:-http://openfga:8080}"
+          export SMS_PROVIDER="${SMS_PROVIDER:-aliyun}"
+
           # Render .env locally from template, then push to ECS
           envsubst < deploy/ecs/.env.tmpl > /tmp/.env.rendered
 
