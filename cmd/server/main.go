@@ -334,7 +334,7 @@ func selectSMSProvider(logger *zap.Logger) authn.SMSProvider {
 			AccessKeySecret:      os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
 			SignName:             os.Getenv("ALIYUN_SMS_SIGN_NAME"),
 			RegisterTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_REGISTER"),
-		})
+		}, logger)
 		if err != nil {
 			logger.Warn("init aliyun sms provider failed, fallback to log provider", zap.Error(err))
 			return authn.NewLogSMSProvider(logger)
