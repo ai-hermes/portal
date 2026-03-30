@@ -104,6 +104,7 @@ jobs:
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           SWAGGER_ENABLED: ${{ vars.SWAGGER_ENABLED }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
+          LITELLM_DEFAULT_MODEL: ${{ vars.LITELLM_DEFAULT_MODEL || secrets.LITELLM_DEFAULT_MODEL }}
           LITELLM_MASTER_KEY: ${{ secrets.LITELLM_MASTER_KEY }}
           OPENFGA_STORE_ID: ${{ secrets.OPENFGA_STORE_ID }}
           SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
@@ -127,6 +128,8 @@ jobs:
           export SMS_MAX_PER_IP="${SMS_MAX_PER_IP:-20}"
           export PASSWORD_RESET_TTL="${PASSWORD_RESET_TTL:-15m}"
           export SWAGGER_ENABLED="${SWAGGER_ENABLED:-true}"
+          export LITELLM_BASE_URL="${LITELLM_BASE_URL}"
+          export LITELLM_DEFAULT_MODEL="${LITELLM_DEFAULT_MODEL:-gpt-4o-mini}"
           export LITELLM_HTTP_TIMEOUT="${LITELLM_HTTP_TIMEOUT:-5s}"
           export LITELLM_DEFAULT_USER_QUOTA="${LITELLM_DEFAULT_USER_QUOTA:-10}"
           export AUTHZ_PROVIDER="${AUTHZ_PROVIDER:-openfga}"
