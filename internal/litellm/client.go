@@ -58,6 +58,14 @@ type CallRecord struct {
 	Cost             float64
 }
 
+type ModelInfo struct {
+	ID            string         `json:"id"`
+	ModelName     string         `json:"model_name"`
+	Provider      string         `json:"provider,omitempty"`
+	ContextWindow int64          `json:"context_window,omitempty"`
+	Raw           map[string]any `json:"raw,omitempty"`
+}
+
 type GenerateKeyInput struct {
 	KeyAlias  string
 	MaxBudget float64
@@ -210,6 +218,39 @@ func (c *Client) ListRecentCallsByKey(ctx context.Context, apiKey string, limit 
 		return []CallRecord{}, nil
 	}
 	return []CallRecord{}, nil
+}
+
+func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
+	candidates := []string{
+		"/v1/models",
+		"/models",
+		"/model/info",
+	}
+	var lastErr error
+	sawNotFound := false
+	for _, path := range candidates {
+		data, err := c.doJSON(ctx, http.MethodGet, path, nil)
+		if err != nil {
+			if isNotFoundError(err) {
+				sawNotFound = true
+				continue
+			}
+			lastErr = err
+			continue
+		}
+		items := modelRecordsFromMap(data)
+		if len(items) == 0 {
+			continue
+		}
+		return items, nil
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	if sawNotFound {
+		return []ModelInfo{}, nil
+	}
+	return []ModelInfo{}, nil
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, payload any) (map[string]any, error) {
@@ -412,6 +453,178 @@ func callRecordsFromMap(m map[string]any) []CallRecord {
 		}
 	}
 	return items
+}
+
+func modelRecordsFromMap(m map[string]any) []ModelInfo {
+	items := make([]ModelInfo, 0)
+	seen := make(map[string]struct{})
+	appendItem := func(item ModelInfo) {
+		key := strings.ToLower(strings.TrimSpace(item.ID)) + "|" + strings.ToLower(strings.TrimSpace(item.ModelName))
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		items = append(items, item)
+	}
+
+	candidates := []string{"data", "items", "models", "model_list"}
+	for _, key := range candidates {
+		value, ok := m[key]
+		if !ok {
+			continue
+		}
+		if rawList, ok := asSlice(value); ok {
+			for _, raw := range rawList {
+				entry, ok := asMap(raw)
+				if !ok {
+					continue
+				}
+				item, ok := modelInfoFromMap(entry, "")
+				if !ok {
+					continue
+				}
+				appendItem(item)
+			}
+			continue
+		}
+		if rawMap, ok := asMap(value); ok {
+			for modelID, raw := range rawMap {
+				entry, ok := asMap(raw)
+				if !ok {
+					continue
+				}
+				item, ok := modelInfoFromMap(entry, modelID)
+				if !ok {
+					continue
+				}
+				appendItem(item)
+			}
+		}
+	}
+	if len(items) > 0 {
+		return items
+	}
+
+	if item, ok := modelInfoFromMap(m, ""); ok {
+		appendItem(item)
+		return items
+	}
+
+	for key, value := range m {
+		if isModelListMetaKey(key) {
+			continue
+		}
+		entry, ok := asMap(value)
+		if !ok {
+			continue
+		}
+		item, ok := modelInfoFromMap(entry, key)
+		if !ok {
+			continue
+		}
+		appendItem(item)
+	}
+
+	return items
+}
+
+func modelInfoFromMap(m map[string]any, fallbackID string) (ModelInfo, bool) {
+	id := firstNonEmptyString(
+		firstString(m, "id", "model_id", "model_name", "model", "name"),
+		nestedString(m, "model_info", "id"),
+		nestedString(m, "model_info", "model_name"),
+		nestedString(m, "model_info", "model"),
+		nestedString(m, "model_info", "name"),
+		strings.TrimSpace(fallbackID),
+	)
+	modelName := firstNonEmptyString(
+		firstString(m, "model_name", "model", "name", "id", "model_id"),
+		nestedString(m, "model_info", "model_name"),
+		nestedString(m, "model_info", "model"),
+		nestedString(m, "model_info", "name"),
+		id,
+	)
+	if id == "" && modelName == "" {
+		return ModelInfo{}, false
+	}
+
+	provider := firstNonEmptyString(
+		firstString(m, "provider", "litellm_provider", "custom_llm_provider", "owned_by"),
+		nestedString(m, "model_info", "provider"),
+		nestedString(m, "model_info", "litellm_provider"),
+		nestedString(m, "model_info", "custom_llm_provider"),
+		nestedString(m, "model_info", "owned_by"),
+	)
+
+	contextWindow := int64(firstNumberOrZero(
+		m,
+		"context_window",
+		"max_input_tokens",
+		"max_context_tokens",
+		"max_tokens",
+	))
+	if contextWindow <= 0 {
+		contextWindow = int64(firstNonZeroNumber(
+			nestedNumber(m, "model_info", "context_window"),
+			nestedNumber(m, "model_info", "max_input_tokens"),
+			nestedNumber(m, "model_info", "max_context_tokens"),
+			nestedNumber(m, "model_info", "max_tokens"),
+		))
+	}
+
+	return ModelInfo{
+		ID:            id,
+		ModelName:     modelName,
+		Provider:      provider,
+		ContextWindow: contextWindow,
+		Raw:           cloneMap(m),
+	}, true
+}
+
+func nestedNumber(m map[string]any, objectKey, fieldKey string) float64 {
+	raw, ok := m[objectKey]
+	if !ok || raw == nil {
+		return 0
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return 0
+	}
+	return firstNumberOrZero(obj, fieldKey)
+}
+
+func firstNonZeroNumber(values ...float64) float64 {
+	for _, value := range values {
+		if value > 0 && !math.IsNaN(value) && !math.IsInf(value, 0) {
+			return value
+		}
+	}
+	return 0
+}
+
+func asSlice(v any) ([]any, bool) {
+	list, ok := v.([]any)
+	return list, ok
+}
+
+func cloneMap(m map[string]any) map[string]any {
+	if len(m) == 0 {
+		return nil
+	}
+	dup := make(map[string]any, len(m))
+	for key, value := range m {
+		dup[key] = value
+	}
+	return dup
+}
+
+func isModelListMetaKey(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "object", "data", "items", "models", "model_list", "count", "total":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseTime(m map[string]any) time.Time {
