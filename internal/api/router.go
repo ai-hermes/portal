@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
@@ -16,6 +17,7 @@ import (
 	"github.com/warjiang/portal/internal/identity"
 	"github.com/warjiang/portal/internal/litellmcredit"
 	"github.com/warjiang/portal/internal/models"
+	"go.uber.org/zap"
 )
 
 type Dependencies struct {
@@ -24,18 +26,30 @@ type Dependencies struct {
 	Audit          *audit.Service
 	LiteLLMCredit  *litellmcredit.Service
 	SwaggerEnabled bool
+	Logger         *zap.Logger
 }
 
 type Router struct {
-	deps Dependencies
+	deps    Dependencies
+	logger  *zap.Logger
+	authLog *zap.Logger
 }
 
 const principalContextKey = "principal"
 
 func NewRouter(deps Dependencies) http.Handler {
-	r := &Router{deps: deps}
+	logger := deps.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	r := &Router{
+		deps:    deps,
+		logger:  logger,
+		authLog: logger.Named("auth_http"),
+	}
 	engine := gin.New()
 	engine.HandleMethodNotAllowed = true
+	engine.Use(r.accessLogMiddleware())
 
 	engine.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
@@ -110,6 +124,7 @@ func (r *Router) handleRegister(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+	r.authLog.Info("auth register request", zap.String("email", strings.TrimSpace(body.Email)), zap.String("remote_addr", c.Request.RemoteAddr))
 
 	result, err := r.deps.Authn.Register(c.Request.Context(), authn.RegisterInput{
 		Email:       body.Email,
@@ -117,9 +132,11 @@ func (r *Router) handleRegister(c *gin.Context) {
 		DisplayName: body.DisplayName,
 	}, c.Request.RemoteAddr, c.Request.UserAgent())
 	if err != nil {
+		r.authLog.Warn("auth register failed", zap.String("email", strings.TrimSpace(body.Email)), zap.Error(err))
 		r.writeAuthError(c, err)
 		return
 	}
+	r.authLog.Info("auth register success", zap.String("email", strings.TrimSpace(body.Email)), zap.String("user_id", result.UserID), zap.String("tenant_id", result.TenantID))
 	c.JSON(http.StatusCreated, result)
 }
 
@@ -186,11 +203,14 @@ func (r *Router) handleLogin(c *gin.Context) {
 	if account == "" {
 		account = body.Email
 	}
+	r.authLog.Info("auth login request", zap.String("account", strings.TrimSpace(account)), zap.String("remote_addr", c.Request.RemoteAddr))
 	pair, err := r.deps.Authn.Login(c.Request.Context(), account, body.Password, c.Request.RemoteAddr, c.Request.UserAgent())
 	if err != nil {
+		r.authLog.Warn("auth login failed", zap.String("account", strings.TrimSpace(account)), zap.Error(err))
 		r.writeAuthError(c, err)
 		return
 	}
+	r.authLog.Info("auth login success", zap.String("account", strings.TrimSpace(account)))
 	c.JSON(http.StatusOK, pair)
 }
 
@@ -221,13 +241,16 @@ func (r *Router) handleSendSMSCode(c *gin.Context) {
 	if body.Purpose == "" {
 		body.Purpose = "register"
 	}
+	r.authLog.Info("auth send sms code request", zap.String("phone", strings.TrimSpace(body.Phone)), zap.String("purpose", strings.TrimSpace(body.Purpose)), zap.String("remote_addr", c.Request.RemoteAddr))
 	if err := r.deps.Authn.SendSMSCode(c.Request.Context(), authn.SendSMSCodeInput{
 		Phone:   body.Phone,
 		Purpose: body.Purpose,
 	}, c.Request.RemoteAddr); err != nil {
+		r.authLog.Warn("auth send sms code failed", zap.String("phone", strings.TrimSpace(body.Phone)), zap.String("purpose", strings.TrimSpace(body.Purpose)), zap.Error(err))
 		r.writeAuthError(c, err)
 		return
 	}
+	r.authLog.Info("auth send sms code success", zap.String("phone", strings.TrimSpace(body.Phone)), zap.String("purpose", strings.TrimSpace(body.Purpose)))
 	c.JSON(http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -959,6 +982,38 @@ func (r *Router) writeLiteLLMCreditError(c *gin.Context, err error) {
 			"message": "internal server error",
 		},
 	})
+}
+
+func (r *Router) accessLogMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		latency := time.Since(start)
+		status := c.Writer.Status()
+		fields := []zap.Field{
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.FullPath()),
+			zap.String("raw_path", c.Request.URL.Path),
+			zap.Int("status", status),
+			zap.Int64("latency_ms", latency.Milliseconds()),
+			zap.String("client_ip", c.ClientIP()),
+			zap.String("remote_addr", c.Request.RemoteAddr),
+			zap.String("user_agent", c.Request.UserAgent()),
+		}
+		if reqID := c.GetHeader("X-Request-Id"); reqID != "" {
+			fields = append(fields, zap.String("request_id", reqID))
+		}
+
+		switch {
+		case status >= http.StatusInternalServerError:
+			r.logger.Error("http request", fields...)
+		case status >= http.StatusBadRequest:
+			r.logger.Warn("http request", fields...)
+		default:
+			r.logger.Info("http request", fields...)
+		}
+	}
 }
 
 func decodeJSON(c *gin.Context, dst any) error {
