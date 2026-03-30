@@ -1,0 +1,1100 @@
+basePath: /
+definitions:
+  api.changePasswordRequest:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    type: object
+  api.checkPermissionRequest:
+    properties:
+      object:
+        type: string
+      relation:
+        type: string
+      subject:
+        type: string
+    type: object
+  api.forgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  api.liteLLMCreditAdjustRequest:
+    properties:
+      amount:
+        type: number
+      mode:
+        type: string
+      reason:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  api.loginRequest:
+    properties:
+      account:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  api.registerByPhoneRequest:
+    properties:
+      code:
+        type: string
+      display_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  api.registerRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  api.resetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
+        type: string
+    type: object
+  api.sendSMSCodeRequest:
+    properties:
+      phone:
+        type: string
+      purpose:
+        type: string
+    type: object
+  api.swaggerAPIErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/api.swaggerErrorBody'
+    type: object
+  api.swaggerAllowedResponse:
+    properties:
+      allowed:
+        type: boolean
+    type: object
+  api.swaggerAuditListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.AuditEvent'
+        type: array
+    type: object
+  api.swaggerErrorBody:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  api.swaggerLiteLLMAccessResponse:
+    properties:
+      can_manage:
+        type: boolean
+      service_available:
+        type: boolean
+    type: object
+  api.swaggerLiteLLMCallListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.RecentCall'
+        type: array
+      limit:
+        type: integer
+    type: object
+  api.swaggerLiteLLMConfigResponse:
+    properties:
+      base_url:
+        type: string
+      default_model:
+        type: string
+    type: object
+  api.swaggerLiteLLMEventListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.CreditEvent'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+    type: object
+  api.swaggerLiteLLMModelListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellm.ModelInfo'
+        type: array
+      total:
+        type: integer
+    type: object
+  api.swaggerMemberListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/identity.Principal'
+        type: array
+    type: object
+  api.swaggerOKResponse:
+    properties:
+      ok:
+        type: boolean
+    type: object
+  api.swaggerSimpleErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  api.swaggerStatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  api.swaggerVerifiedResponse:
+    properties:
+      verified:
+        type: boolean
+    type: object
+  api.swaggerWrittenResponse:
+    properties:
+      written:
+        type: integer
+    type: object
+  api.verifyEmailRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    type: object
+  api.writeRelationshipRequest:
+    properties:
+      tuples:
+        items:
+          $ref: '#/definitions/models.PolicyTuple'
+        type: array
+    type: object
+  authn.RegisterResult:
+    properties:
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  authn.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  identity.Principal:
+    properties:
+      email:
+        type: string
+      role:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellm.ModelInfo:
+    properties:
+      context_window:
+        type: integer
+      id:
+        type: string
+      model_name:
+        type: string
+      provider:
+        type: string
+      raw:
+        additionalProperties: {}
+        type: object
+    type: object
+  litellmcredit.CreditEvent:
+    properties:
+      actor_email:
+        type: string
+      actor_user_id:
+        type: string
+      after_budget:
+        type: number
+      amount:
+        type: number
+      before_budget:
+        type: number
+      created_at:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: integer
+      mode:
+        type: string
+      reason:
+        type: string
+      result:
+        type: string
+      tenant_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellmcredit.CreditSnapshot:
+    properties:
+      api_key:
+        type: string
+      budget_remaining:
+        type: number
+      budget_total:
+        type: number
+      key_alias:
+        type: string
+      last_synced_at:
+        type: string
+      litellm_user_id:
+        type: string
+      spend_used:
+        type: number
+      tenant_id:
+        type: string
+      unit:
+        type: string
+      user_id:
+        type: string
+    type: object
+  litellmcredit.RecentCall:
+    properties:
+      at:
+        type: string
+      completion_tokens:
+        type: integer
+      cost:
+        type: number
+      model:
+        type: string
+      prompt_tokens:
+        type: integer
+      total_tokens:
+        type: integer
+    type: object
+  models.AuditEvent:
+    properties:
+      action:
+        type: string
+      actor:
+        type: string
+      at:
+        type: string
+      id:
+        type: integer
+      ip:
+        type: string
+      resource:
+        type: string
+      result:
+        type: string
+      tenant_id:
+        type: string
+      trace_id:
+        type: string
+      user_agent:
+        type: string
+    type: object
+  models.PolicyTuple:
+    properties:
+      object:
+        type: string
+      relation:
+        type: string
+      subject:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API documentation for the Portal backend.
+  title: Portal API
+  version: "1.0"
+paths:
+  /api/v1/admin/litellm/access:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMAccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get LiteLLM admin access flags
+      tags:
+      - litellm-admin
+  /api/v1/admin/litellm/calls/{tenant_id}/{user_id}:
+    get:
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: Max items (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMCallListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List user recent calls (admin)
+      tags:
+      - litellm-admin
+  /api/v1/admin/litellm/credits/{tenant_id}/{user_id}:
+    get:
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user credit snapshot (admin)
+      tags:
+      - litellm-admin
+  /api/v1/admin/litellm/credits/adjust:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Adjust payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.liteLLMCreditAdjustRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Adjust user credit (admin)
+      tags:
+      - litellm-admin
+  /api/v1/admin/litellm/events:
+    get:
+      parameters:
+      - description: Max items (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMEventListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List credit events (admin)
+      tags:
+      - litellm-admin
+  /api/v1/audit/events:
+    get:
+      parameters:
+      - description: Actor filter
+        in: query
+        name: actor
+        type: string
+      - description: Action filter
+        in: query
+        name: action
+        type: string
+      - description: Resource filter
+        in: query
+        name: resource
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerAuditListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Query audit events
+      tags:
+      - audit
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authn.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerOKResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Logout by refresh token
+      tags:
+      - auth
+  /api/v1/auth/password/change:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Change password payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerOKResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change current password
+      tags:
+      - auth
+  /api/v1/auth/password/forgot:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Forgot password payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.forgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerOKResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Request password reset
+      tags:
+      - auth
+  /api/v1/auth/password/reset:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Reset password payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerOKResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Reset password
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/authn.TokenPair'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Refresh token pair
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/authn.RegisterResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Register by email
+      tags:
+      - auth
+  /api/v1/auth/register/phone:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register by phone payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.registerByPhoneRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/authn.RegisterResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Register by phone
+      tags:
+      - auth
+  /api/v1/auth/sms/send-code:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: SMS request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.sendSMSCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerOKResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Send registration SMS code
+      tags:
+      - auth
+  /api/v1/auth/verify-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Verify email payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.verifyEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerVerifiedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      summary: Verify email by code
+      tags:
+      - auth
+  /api/v1/config/litellm:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMConfigResponse'
+      summary: Get LiteLLM client config
+      tags:
+      - litellm
+  /api/v1/litellm/me/calls:
+    get:
+      parameters:
+      - description: Max items (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMCallListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my recent LiteLLM calls
+      tags:
+      - litellm
+  /api/v1/litellm/me/credit:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/litellmcredit.CreditSnapshot'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my LiteLLM credit snapshot
+      tags:
+      - litellm
+  /api/v1/litellm/me/models:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerLiteLLMModelListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/api.swaggerAPIErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List available LiteLLM models
+      tags:
+      - litellm
+  /api/v1/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/identity.Principal'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current principal
+      tags:
+      - user
+  /api/v1/permissions/check:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Permission check payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.checkPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerAllowedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Check a policy tuple
+      tags:
+      - authz
+  /api/v1/policies/relationships:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Relationship payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.writeRelationshipRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerWrittenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Write policy relationships
+      tags:
+      - authz
+  /api/v1/tenants/{tenant_id}/members:
+    get:
+      parameters:
+      - description: Tenant ID
+        in: path
+        name: tenant_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerMemberListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.swaggerSimpleErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List tenant members
+      tags:
+      - tenant
+  /healthz:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.swaggerStatusResponse'
+      summary: Health check
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: 'Use JWT bearer token: `Bearer <token>`.'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
