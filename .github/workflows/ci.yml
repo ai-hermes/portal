@@ -17,6 +17,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Build swagger docs
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/server/main.go -o docs --parseInternal
+
+      - name: Verify swagger docs up to date
+        run: git diff --exit-code -- docs/docs.go docs/swagger.json docs/swagger.yaml
+
       - name: Go test
         run: go test ./...
 

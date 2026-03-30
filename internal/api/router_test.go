@@ -27,3 +27,23 @@ func TestLiteLLMAdminRequiresAuth(t *testing.T) {
 		t.Fatalf("expected 401 got %d", w.Code)
 	}
 }
+
+func TestSwaggerDisabledByDefault(t *testing.T) {
+	h := api.NewRouter(api.Dependencies{})
+	req := httptest.NewRequest(http.MethodGet, "/swagger/index.html", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 got %d", w.Code)
+	}
+}
+
+func TestSwaggerEnabled(t *testing.T) {
+	h := api.NewRouter(api.Dependencies{SwaggerEnabled: true})
+	req := httptest.NewRequest(http.MethodGet, "/swagger/index.html", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d", w.Code)
+	}
+}
