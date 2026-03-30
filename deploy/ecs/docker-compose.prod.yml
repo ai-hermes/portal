@@ -16,7 +16,6 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE}
-    container_name: ai-hermes-portal-backend
     restart: unless-stopped
     environment:
       PORT: ":8080"
