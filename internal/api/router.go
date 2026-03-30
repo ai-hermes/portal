@@ -15,18 +15,22 @@ import (
 	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
 	"github.com/warjiang/portal/internal/identity"
+	"github.com/warjiang/portal/internal/litellm"
 	"github.com/warjiang/portal/internal/litellmcredit"
 	"github.com/warjiang/portal/internal/models"
 	"go.uber.org/zap"
 )
 
 type Dependencies struct {
-	Authn          *authn.Service
-	Authz          *authz.Service
-	Audit          *audit.Service
-	LiteLLMCredit  *litellmcredit.Service
-	SwaggerEnabled bool
-	Logger         *zap.Logger
+	Authn               *authn.Service
+	Authz               *authz.Service
+	Audit               *audit.Service
+	LiteLLM             *litellm.Client
+	LiteLLMCredit       *litellmcredit.Service
+	LiteLLMBaseURL      string
+	LiteLLMDefaultModel string
+	SwaggerEnabled      bool
+	Logger              *zap.Logger
 }
 
 type Router struct {
@@ -35,9 +39,22 @@ type Router struct {
 	authLog *zap.Logger
 }
 
-const principalContextKey = "principal"
+const (
+	principalContextKey        = "principal"
+	defaultLiteLLMBaseURL      = "https://llmv2.spotty.com.cn/"
+	defaultLiteLLMDefaultModel = "gpt-4o-mini"
+)
 
 func NewRouter(deps Dependencies) http.Handler {
+	deps.LiteLLMBaseURL = strings.TrimSpace(deps.LiteLLMBaseURL)
+	if deps.LiteLLMBaseURL == "" {
+		deps.LiteLLMBaseURL = defaultLiteLLMBaseURL
+	}
+	deps.LiteLLMDefaultModel = strings.TrimSpace(deps.LiteLLMDefaultModel)
+	if deps.LiteLLMDefaultModel == "" {
+		deps.LiteLLMDefaultModel = defaultLiteLLMDefaultModel
+	}
+
 	logger := deps.Logger
 	if logger == nil {
 		logger = zap.NewNop()
@@ -71,6 +88,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	auth.POST("/password/forgot", r.handleForgotPassword)
 	auth.POST("/password/reset", r.handleResetPassword)
 	auth.POST("/password/change", r.withAuth(), r.handleChangePassword)
+	engine.GET("/api/v1/config/litellm", r.handleLiteLLMConfig)
 
 	protected := engine.Group("/api/v1")
 	protected.Use(r.withAuth())
@@ -80,6 +98,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	protected.GET("/audit/events", r.handleAuditQuery)
 	protected.GET("/tenants/:tenant_id/members", r.handleTenantMembers)
 	protected.GET("/litellm/me/credit", r.handleLiteLLMMyCredit)
+	protected.GET("/litellm/me/models", r.handleLiteLLMMyModels)
 	protected.GET("/litellm/me/calls", r.handleLiteLLMMyCalls)
 	protected.GET("/admin/litellm/credits/:tenant_id/:user_id", r.handleLiteLLMCreditGet)
 	protected.POST("/admin/litellm/credits/adjust", r.handleLiteLLMCreditAdjust)
@@ -503,6 +522,13 @@ func (r *Router) handleMe(c *gin.Context) {
 	c.JSON(http.StatusOK, principal)
 }
 
+func (r *Router) handleLiteLLMConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, map[string]string{
+		"base_url":      r.deps.LiteLLMBaseURL,
+		"default_model": r.deps.LiteLLMDefaultModel,
+	})
+}
+
 // handleTenantMembers godoc
 // @Summary List tenant members
 // @Description Lists members of the requested tenant.
@@ -892,6 +918,28 @@ func (r *Router) handleLiteLLMMyCalls(c *gin.Context) {
 	c.JSON(http.StatusOK, map[string]any{"items": items, "limit": limit})
 }
 
+func (r *Router) handleLiteLLMMyModels(c *gin.Context) {
+	if _, ok := principalFromContext(c); !ok {
+		c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing principal"})
+		return
+	}
+	if r.deps.LiteLLM == nil {
+		c.JSON(http.StatusServiceUnavailable, map[string]any{
+			"error": map[string]string{
+				"code":    "service_unavailable",
+				"message": "litellm service is unavailable",
+			},
+		})
+		return
+	}
+	items, err := r.deps.LiteLLM.ListModels(c.Request.Context())
+	if err != nil {
+		r.writeLiteLLMError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"items": items, "total": len(items)})
+}
+
 // handleLiteLLMRecentCalls godoc
 // @Summary List user recent calls (admin)
 // @Description Lists recent LiteLLM calls for a tenant user (platform admin only).
@@ -980,6 +1028,15 @@ func (r *Router) writeLiteLLMCreditError(c *gin.Context, err error) {
 		"error": map[string]string{
 			"code":    "internal_error",
 			"message": "internal server error",
+		},
+	})
+}
+
+func (r *Router) writeLiteLLMError(c *gin.Context, err error) {
+	c.JSON(http.StatusBadGateway, map[string]any{
+		"error": map[string]string{
+			"code":    "litellm_error",
+			"message": err.Error(),
 		},
 	})
 }

@@ -37,6 +37,11 @@ export type LiteLLMRecentCall = {
   cost: number;
 };
 
+export type LiteLLMConfig = {
+  base_url: string;
+  default_model: string;
+};
+
 export type LiteLLMCreditEvent = {
   id: number;
   tenant_id: string;
@@ -243,6 +248,10 @@ export function writeRelationships(tuples: Array<{ subject: string; relation: st
 export function listAudit(action?: string) {
   const q = action ? `?action=${encodeURIComponent(action)}` : "";
   return apiFetch<{ items: AuditEvent[] }>(`${apiBaseURL}/api/v1/audit/events${q}`);
+}
+
+export function getLiteLLMConfig() {
+  return apiFetch<LiteLLMConfig>(`${apiBaseURL}/api/v1/config/litellm`);
 }
 
 export function getLiteLLMCredit(tenantID: string, userID: string) {

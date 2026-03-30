@@ -133,7 +133,9 @@ Notes:
 - `POST /api/v1/permissions/check`
 - `POST /api/v1/policies/relationships`
 - `GET /api/v1/audit/events`
+- `GET /api/v1/config/litellm`
 - `GET /api/v1/litellm/me/credit`
+- `GET /api/v1/litellm/me/models`
 - `GET /api/v1/litellm/me/calls`
 - `GET /api/v1/admin/litellm/credits/:tenant_id/:user_id`
 - `POST /api/v1/admin/litellm/credits/adjust`
@@ -180,6 +182,7 @@ Swagger UI: `http://localhost:8080/swagger/index.html`
 - `PASSWORD_RESET_TTL` default `15m`
 - `SWAGGER_ENABLED` default `false` (set `true` to expose `/swagger/index.html`)
 - `LITELLM_BASE_URL` LiteLLM service base URL, default `https://llmv2.spotty.com.cn/`
+- `LITELLM_DEFAULT_MODEL` client-facing default LiteLLM model, default `gpt-4o-mini`
 - `LITELLM_MASTER_KEY` LiteLLM master/admin key
 - `LITELLM_HTTP_TIMEOUT` LiteLLM API timeout, default `5s`
 - `LITELLM_DEFAULT_USER_QUOTA` auto-provision quota for new/first-login users, default `10`

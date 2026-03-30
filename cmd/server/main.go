@@ -36,6 +36,17 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
+
+const (
+	defaultLiteLLMBaseURL      = "https://llmv2.spotty.com.cn/"
+	defaultLiteLLMDefaultModel = "gpt-4o-mini"
+)
+
+type liteLLMRuntimeConfig struct {
+	BaseURL      string
+	DefaultModel string
+}
+
 func main() {
 	bootstrapLogger := mustNewLogger(logging.Config{Level: "info", Format: "console"})
 	defer logging.Sync(bootstrapLogger)
@@ -66,7 +77,9 @@ func main() {
 	authzProvider := selectAuthzProvider(logger)
 	smsProvider := selectSMSProvider(logger)
 	emailProvider := authn.NewLogEmailProvider(logger)
-	liteLLMCreditSvc := buildLiteLLMCreditService(db, logger)
+	liteLLMConfig := resolveLiteLLMRuntimeConfig()
+	liteLLMClient := buildLiteLLMClient(liteLLMConfig, logger)
+	liteLLMCreditSvc := buildLiteLLMCreditService(db, liteLLMClient, logger)
 	authnSvc, err := authn.NewService(db, authn.Config{
 		JWTSigningKey:     envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
 		AccessTokenTTL:    parseDurationOr(logger, "ACCESS_TOKEN_TTL", 15*time.Minute),
@@ -86,12 +99,15 @@ func main() {
 	authzSvc := authz.NewService(authzProvider)
 
 	router := api.NewRouter(api.Dependencies{
-		Authn:          authnSvc,
-		Authz:          authzSvc,
-		Audit:          auditSvc,
-		LiteLLMCredit:  liteLLMCreditSvc,
-		SwaggerEnabled: parseBoolOr(logger, "SWAGGER_ENABLED", true),
-		Logger:         logger,
+		Authn:               authnSvc,
+		Authz:               authzSvc,
+		Audit:               auditSvc,
+		LiteLLM:             liteLLMClient,
+		LiteLLMCredit:       liteLLMCreditSvc,
+		LiteLLMBaseURL:      liteLLMConfig.BaseURL,
+		LiteLLMDefaultModel: liteLLMConfig.DefaultModel,
+		SwaggerEnabled:      parseBoolOr(logger, "SWAGGER_ENABLED", true),
+		Logger:              logger,
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
 	handler := api.NewAppHandler(router, webDir)
@@ -113,6 +129,13 @@ func main() {
 	logger.Info("portal backend listening", zap.String("addr", srv.Addr))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		logger.Fatal("server failed", zap.Error(err))
+	}
+}
+
+func resolveLiteLLMRuntimeConfig() liteLLMRuntimeConfig {
+	return liteLLMRuntimeConfig{
+		BaseURL:      strings.TrimSpace(envOr("LITELLM_BASE_URL", defaultLiteLLMBaseURL)),
+		DefaultModel: strings.TrimSpace(envOr("LITELLM_DEFAULT_MODEL", defaultLiteLLMDefaultModel)),
 	}
 }
 
@@ -143,23 +166,31 @@ func buildRuntimeLogger(fallback *zap.Logger) *zap.Logger {
 	return logger
 }
 
-func buildLiteLLMCreditService(db *gorm.DB, logger *zap.Logger) *litellmcredit.Service {
-	baseURL := strings.TrimSpace(envOr("LITELLM_BASE_URL", "https://llmv2.spotty.com.cn/"))
+func buildLiteLLMClient(cfg liteLLMRuntimeConfig, logger *zap.Logger) *litellm.Client {
 	masterKey := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY"))
 	if masterKey == "" {
-		logger.Info("litellm credit service disabled", zap.String("reason", "missing LITELLM_MASTER_KEY"))
+		logger.Info("litellm integration disabled", zap.String("reason", "missing LITELLM_MASTER_KEY"))
 		return nil
 	}
 
 	client, err := litellm.NewClient(litellm.Config{
-		BaseURL:   baseURL,
+		BaseURL:   cfg.BaseURL,
 		MasterKey: masterKey,
 		HTTPClient: &http.Client{
 			Timeout: parseDurationOr(logger, "LITELLM_HTTP_TIMEOUT", 5*time.Second),
 		},
 	})
 	if err != nil {
-		logger.Warn("litellm credit service disabled: create client failed", zap.Error(err))
+		logger.Warn("litellm integration disabled: create client failed", zap.Error(err))
+		return nil
+	}
+	logger.Info("litellm integration enabled", zap.String("base_url", cfg.BaseURL))
+	return client
+}
+
+func buildLiteLLMCreditService(db *gorm.DB, client *litellm.Client, logger *zap.Logger) *litellmcredit.Service {
+	if client == nil {
+		logger.Info("litellm credit service disabled", zap.String("reason", "litellm client unavailable"))
 		return nil
 	}
 

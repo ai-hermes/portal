@@ -22,40 +22,24 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns whether current user can manage LiteLLM credit.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "litellm"
+                    "litellm-admin"
                 ],
-                "summary": "LiteLLM access info",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "summary": "Get LiteLLM admin access flags",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.liteLLMAccessResponse"
+                            "$ref": "#/definitions/api.swaggerLiteLLMAccessResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -68,22 +52,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists recent LiteLLM calls for a tenant user (platform admin only).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "litellm"
+                    "litellm-admin"
                 ],
                 "summary": "List user recent calls (admin)",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Tenant ID",
@@ -100,7 +76,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max number of records",
+                        "description": "Max items (default 20)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -109,31 +85,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.liteLLMRecentCallsResponse"
+                            "$ref": "#/definitions/api.swaggerLiteLLMCallListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -146,7 +116,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Adjusts LiteLLM credit by set/delta (platform admin only).",
                 "consumes": [
                     "application/json"
                 ],
@@ -154,20 +123,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "litellm"
+                    "litellm-admin"
                 ],
                 "summary": "Adjust user credit (admin)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Adjust credit payload",
-                        "name": "request",
+                        "description": "Adjust payload",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -185,31 +147,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -222,22 +178,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Gets LiteLLM credit snapshot for tenant user (platform admin only).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "litellm"
+                    "litellm-admin"
                 ],
-                "summary": "Get user credit (admin)",
+                "summary": "Get user credit snapshot (admin)",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Tenant ID",
@@ -263,25 +211,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -294,31 +236,23 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists LiteLLM credit adjustment events (platform admin only).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "litellm"
+                    "litellm-admin"
                 ],
                 "summary": "List credit events (admin)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "type": "integer",
-                        "description": "Page size",
+                        "description": "Max items (default 50)",
                         "name": "limit",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Page offset",
+                        "description": "Offset (default 0)",
                         "name": "offset",
                         "in": "query"
                     }
@@ -327,31 +261,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.liteLLMEventsResponse"
+                            "$ref": "#/definitions/api.swaggerLiteLLMEventListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -364,7 +292,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Queries tenant audit events with optional filters.",
                 "produces": [
                     "application/json"
                 ],
@@ -375,26 +302,19 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Actor user id",
+                        "description": "Actor filter",
                         "name": "actor",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Action",
+                        "description": "Action filter",
                         "name": "action",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Resource",
+                        "description": "Resource filter",
                         "name": "resource",
                         "in": "query"
                     }
@@ -403,19 +323,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.auditEventsResponse"
+                            "$ref": "#/definitions/api.swaggerAuditListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -423,7 +343,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/login": {
             "post": {
-                "description": "Logs in by account(email/phone) and password.",
                 "consumes": [
                     "application/json"
                 ],
@@ -437,7 +356,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "Login payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -455,19 +374,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -475,7 +400,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/logout": {
             "post": {
-                "description": "Revokes the given refresh token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -485,11 +409,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Logout",
+                "summary": "Logout by refresh token",
                 "parameters": [
                     {
-                        "description": "Logout payload",
-                        "name": "request",
+                        "description": "Refresh token payload",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -501,19 +425,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.okResponse"
+                            "$ref": "#/definitions/api.swaggerOKResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -526,7 +450,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Changes current user's password.",
                 "consumes": [
                     "application/json"
                 ],
@@ -536,18 +459,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Change password",
+                "summary": "Change current password",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "description": "Change password payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -559,25 +475,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.okResponse"
+                            "$ref": "#/definitions/api.swaggerOKResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -585,7 +501,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/password/forgot": {
             "post": {
-                "description": "Sends password reset token to the email.",
                 "consumes": [
                     "application/json"
                 ],
@@ -599,7 +514,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "Forgot password payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -611,19 +526,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.okResponse"
+                            "$ref": "#/definitions/api.swaggerOKResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -631,7 +546,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/password/reset": {
             "post": {
-                "description": "Resets password with password-reset token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -645,7 +559,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "description": "Reset password payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -657,19 +571,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.okResponse"
+                            "$ref": "#/definitions/api.swaggerOKResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -677,7 +591,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/refresh": {
             "post": {
-                "description": "Exchanges refresh token for a new access/refresh pair.",
                 "consumes": [
                     "application/json"
                 ],
@@ -690,8 +603,8 @@ const docTemplate = `{
                 "summary": "Refresh token pair",
                 "parameters": [
                     {
-                        "description": "Refresh payload",
-                        "name": "request",
+                        "description": "Refresh token payload",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -709,19 +622,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -729,7 +642,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/register": {
             "post": {
-                "description": "Registers a new user and creates a tenant.",
                 "consumes": [
                     "application/json"
                 ],
@@ -739,11 +651,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register user by email",
+                "summary": "Register by email",
                 "parameters": [
                     {
                         "description": "Register payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -761,13 +673,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -775,7 +693,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/register/phone": {
             "post": {
-                "description": "Registers a new user with phone and SMS code.",
                 "consumes": [
                     "application/json"
                 ],
@@ -785,11 +702,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register user by phone",
+                "summary": "Register by phone",
                 "parameters": [
                     {
                         "description": "Register by phone payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -807,13 +724,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -821,7 +744,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/sms/send-code": {
             "post": {
-                "description": "Sends an SMS verification code for a given purpose.",
                 "consumes": [
                     "application/json"
                 ],
@@ -831,11 +753,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Send SMS code",
+                "summary": "Send registration SMS code",
                 "parameters": [
                     {
-                        "description": "Send SMS code payload",
-                        "name": "request",
+                        "description": "SMS request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -847,25 +769,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.okResponse"
+                            "$ref": "#/definitions/api.swaggerOKResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -873,7 +789,6 @@ const docTemplate = `{
         },
         "/api/v1/auth/verify-email": {
             "post": {
-                "description": "Verifies email with the one-time code.",
                 "consumes": [
                     "application/json"
                 ],
@@ -883,11 +798,11 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Verify email",
+                "summary": "Verify email by code",
                 "parameters": [
                     {
                         "description": "Verify email payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -899,19 +814,38 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.verifiedResponse"
+                            "$ref": "#/definitions/api.swaggerVerifiedResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/config/litellm": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "litellm"
+                ],
+                "summary": "Get LiteLLM client config",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerLiteLLMConfigResponse"
                         }
                     }
                 }
@@ -924,25 +858,17 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists recent LiteLLM calls for current user.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "litellm"
                 ],
-                "summary": "List my recent calls",
+                "summary": "List my recent LiteLLM calls",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "type": "integer",
-                        "description": "Max number of records",
+                        "description": "Max items (default 20)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -951,25 +877,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.liteLLMRecentCallsResponse"
+                            "$ref": "#/definitions/api.swaggerLiteLLMCallListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -982,23 +902,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Gets authenticated user's LiteLLM credit snapshot.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "litellm"
                 ],
-                "summary": "Get my credit",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "summary": "Get my LiteLLM credit snapshot",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1009,19 +919,55 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/litellm/me/models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "litellm"
+                ],
+                "summary": "List available LiteLLM models",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerLiteLLMModelListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/api.swaggerAPIErrorResponse"
                         }
                     }
                 }
@@ -1034,23 +980,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns current authenticated principal.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "user"
                 ],
-                "summary": "Current principal",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
+                "summary": "Get current principal",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1061,13 +997,7 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiErrorResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -1080,7 +1010,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Checks whether a subject has relation on object.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1090,18 +1019,11 @@ const docTemplate = `{
                 "tags": [
                     "authz"
                 ],
-                "summary": "Check permission",
+                "summary": "Check a policy tuple",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
                         "description": "Permission check payload",
-                        "name": "request",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1113,25 +1035,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.allowedResponse"
+                            "$ref": "#/definitions/api.swaggerAllowedResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -1144,7 +1066,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Writes relationship tuples (tenant_admin only).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1157,15 +1078,8 @@ const docTemplate = `{
                 "summary": "Write policy relationships",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Relationship tuples payload",
-                        "name": "request",
+                        "description": "Relationship payload",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -1177,31 +1091,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.writtenResponse"
+                            "$ref": "#/definitions/api.swaggerWrittenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -1214,22 +1128,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists members of the requested tenant.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "user"
+                    "tenant"
                 ],
                 "summary": "List tenant members",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer access token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Tenant ID",
@@ -1242,31 +1148,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.tenantMembersResponse"
+                            "$ref": "#/definitions/api.swaggerMemberListResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/api.errorMessageResponse"
+                            "$ref": "#/definitions/api.swaggerSimpleErrorResponse"
                         }
                     }
                 }
@@ -1274,7 +1180,6 @@ const docTemplate = `{
         },
         "/healthz": {
             "get": {
-                "description": "Returns service health status.",
                 "produces": [
                     "application/json"
                 ],
@@ -1286,7 +1191,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.statusResponse"
+                            "$ref": "#/definitions/api.swaggerStatusResponse"
                         }
                     }
                 }
@@ -1526,6 +1431,162 @@ const docTemplate = `{
                 }
             }
         },
+        "api.swaggerAPIErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/api.swaggerErrorBody"
+                }
+            }
+        },
+        "api.swaggerAllowedResponse": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.swaggerAuditListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AuditEvent"
+                    }
+                }
+            }
+        },
+        "api.swaggerErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.swaggerLiteLLMAccessResponse": {
+            "type": "object",
+            "properties": {
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "service_available": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.swaggerLiteLLMCallListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/litellmcredit.RecentCall"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.swaggerLiteLLMConfigResponse": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "default_model": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.swaggerLiteLLMEventListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/litellmcredit.CreditEvent"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.swaggerLiteLLMModelListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/litellm.ModelInfo"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.swaggerMemberListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/identity.Principal"
+                    }
+                }
+            }
+        },
+        "api.swaggerOKResponse": {
+            "type": "object",
+            "properties": {
+                "ok": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.swaggerSimpleErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.swaggerStatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.swaggerVerifiedResponse": {
+            "type": "object",
+            "properties": {
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.swaggerWrittenResponse": {
+            "type": "object",
+            "properties": {
+                "written": {
+                    "type": "integer"
+                }
+            }
+        },
         "api.tenantMembersResponse": {
             "type": "object",
             "properties": {
@@ -1617,6 +1678,27 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
+                }
+            }
+        },
+        "litellm.ModelInfo": {
+            "type": "object",
+            "properties": {
+                "context_window": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "model_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "raw": {
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },
