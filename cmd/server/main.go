@@ -90,7 +90,7 @@ func main() {
 		Authz:          authzSvc,
 		Audit:          auditSvc,
 		LiteLLMCredit:  liteLLMCreditSvc,
-		SwaggerEnabled: parseBoolOr(logger, "SWAGGER_ENABLED", false),
+		SwaggerEnabled: parseBoolOr(logger, "SWAGGER_ENABLED", true),
 		Logger:         logger,
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
