@@ -65,10 +65,11 @@ services:
       openfga-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "/openfga", "version"]
       interval: 10s
       timeout: 3s
-      retries: 10
+      retries: 20
+      start_period: 15s
 
 volumes:
   postgres-data:
