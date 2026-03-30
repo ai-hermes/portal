@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,32 +12,30 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	_ "github.com/warjiang/portal/docs"
 	"github.com/warjiang/portal/internal/api"
 	"github.com/warjiang/portal/internal/audit"
 	"github.com/warjiang/portal/internal/authn"
 	"github.com/warjiang/portal/internal/authz"
 	"github.com/warjiang/portal/internal/litellm"
 	"github.com/warjiang/portal/internal/litellmcredit"
+	"github.com/warjiang/portal/internal/logging"
 	"github.com/warjiang/portal/internal/providers/auditmem"
 	"github.com/warjiang/portal/internal/providers/authzmem"
 	"github.com/warjiang/portal/internal/providers/authzopenfga"
 	"github.com/warjiang/portal/internal/providers/smsaliyun"
+	"go.uber.org/zap"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-//go:generate sh -c "CGO_ENABLED=0 go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api,../../internal/authn,../../internal/identity,../../internal/litellm,../../internal/litellmcredit,../../internal/models -o ../../docs --parseInternal"
-
-// @title Portal API
+// @title AI-Hermes Portal API
 // @version 1.0
-// @description API documentation for the Portal backend.
+// @description AI-Hermes Portal backend APIs.
 // @BasePath /
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Use JWT bearer token: `Bearer <token>`.
 
 const (
 	defaultLiteLLMBaseURL      = "https://llmv2.spotty.com.cn/"
@@ -51,45 +48,52 @@ type liteLLMRuntimeConfig struct {
 }
 
 func main() {
-	loadDotenvFiles()
+	bootstrapLogger := mustNewLogger(logging.Config{Level: "info", Format: "console"})
+	defer logging.Sync(bootstrapLogger)
+
+	loadDotenvFiles(bootstrapLogger)
+
+	logger := buildRuntimeLogger(bootstrapLogger)
+	defer logging.Sync(logger)
 
 	db, err := gorm.Open(postgres.Open(envOr("DATABASE_URL", "postgres://openfga:openfga@localhost:5432/openfga?sslmode=disable")), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("open database failed: %v", err)
+		logger.Fatal("open database failed", zap.Error(err))
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("get std database failed: %v", err)
+		logger.Fatal("get std database failed", zap.Error(err))
 	}
 	defer sqlDB.Close()
 	if err := sqlDB.Ping(); err != nil {
-		log.Fatalf("ping database failed: %v", err)
+		logger.Fatal("ping database failed", zap.Error(err))
 	}
 	if err := authn.Migrate(context.Background(), db); err != nil {
-		log.Fatalf("run auth migrations failed: %v", err)
+		logger.Fatal("run auth migrations failed", zap.Error(err))
 	}
 
 	auditStore := auditmem.NewStore()
 	auditSvc := audit.NewService(auditStore)
-	authzProvider := selectAuthzProvider()
-	smsProvider := selectSMSProvider()
+	authzProvider := selectAuthzProvider(logger)
+	smsProvider := selectSMSProvider(logger)
+	emailProvider := authn.NewLogEmailProvider(logger)
 	liteLLMConfig := resolveLiteLLMRuntimeConfig()
-	liteLLMClient := buildLiteLLMClient(liteLLMConfig)
-	liteLLMCreditSvc := buildLiteLLMCreditService(db, liteLLMClient)
+	liteLLMClient := buildLiteLLMClient(liteLLMConfig, logger)
+	liteLLMCreditSvc := buildLiteLLMCreditService(db, liteLLMClient, logger)
 	authnSvc, err := authn.NewService(db, authn.Config{
 		JWTSigningKey:     envOr("JWT_SIGNING_KEY", "dev-only-change-me"),
-		AccessTokenTTL:    parseDurationOr("ACCESS_TOKEN_TTL", 15*time.Minute),
-		RefreshTokenTTL:   parseDurationOr("REFRESH_TOKEN_TTL", 30*24*time.Hour),
-		EmailCodeTTL:      parseDurationOr("EMAIL_CODE_TTL", 10*time.Minute),
-		SMSCodeTTL:        parseDurationOr("SMS_CODE_TTL", 10*time.Minute),
-		SMSRateWindow:     parseDurationOr("SMS_RATE_WINDOW", 10*time.Minute),
-		SMSResendInterval: parseDurationOr("SMS_RESEND_INTERVAL", 60*time.Second),
-		SMSMaxPerPhone:    parseIntOr("SMS_MAX_PER_PHONE", 5),
-		SMSMaxPerIP:       parseIntOr("SMS_MAX_PER_IP", 20),
-		PasswordResetTTL:  parseDurationOr("PASSWORD_RESET_TTL", 15*time.Minute),
-	}, authn.NewLogEmailProvider(), smsProvider, auditSvc, liteLLMCreditSvc)
+		AccessTokenTTL:    parseDurationOr(logger, "ACCESS_TOKEN_TTL", 15*time.Minute),
+		RefreshTokenTTL:   parseDurationOr(logger, "REFRESH_TOKEN_TTL", 30*24*time.Hour),
+		EmailCodeTTL:      parseDurationOr(logger, "EMAIL_CODE_TTL", 10*time.Minute),
+		SMSCodeTTL:        parseDurationOr(logger, "SMS_CODE_TTL", 10*time.Minute),
+		SMSRateWindow:     parseDurationOr(logger, "SMS_RATE_WINDOW", 10*time.Minute),
+		SMSResendInterval: parseDurationOr(logger, "SMS_RESEND_INTERVAL", 60*time.Second),
+		SMSMaxPerPhone:    parseIntOr(logger, "SMS_MAX_PER_PHONE", 5),
+		SMSMaxPerIP:       parseIntOr(logger, "SMS_MAX_PER_IP", 20),
+		PasswordResetTTL:  parseDurationOr(logger, "PASSWORD_RESET_TTL", 15*time.Minute),
+	}, emailProvider, smsProvider, auditSvc, liteLLMCreditSvc, logger)
 	if err != nil {
-		log.Fatalf("create auth service failed: %v", err)
+		logger.Fatal("create auth service failed", zap.Error(err))
 	}
 
 	authzSvc := authz.NewService(authzProvider)
@@ -102,16 +106,18 @@ func main() {
 		LiteLLMCredit:       liteLLMCreditSvc,
 		LiteLLMBaseURL:      liteLLMConfig.BaseURL,
 		LiteLLMDefaultModel: liteLLMConfig.DefaultModel,
+		SwaggerEnabled:      parseBoolOr(logger, "SWAGGER_ENABLED", true),
+		Logger:              logger,
 	})
 	webDir := envOr("WEB_DIST_DIR", "frontend/dist")
 	handler := api.NewAppHandler(router, webDir)
 	if handler == router {
-		log.Printf("frontend assets unavailable at %s, serving API only", webDir)
+		logger.Warn("frontend assets unavailable, serving API only", zap.String("web_dir", webDir))
 	} else {
-		if abs, err := filepath.Abs(webDir); err == nil {
+		if abs, absErr := filepath.Abs(webDir); absErr == nil {
 			webDir = abs
 		}
-		log.Printf("serving frontend assets from %s", webDir)
+		logger.Info("serving frontend assets", zap.String("web_dir", webDir))
 	}
 
 	srv := &http.Server{
@@ -120,9 +126,9 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Printf("portal backend listening on %s", srv.Addr)
+	logger.Info("portal backend listening", zap.String("addr", srv.Addr))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server failed: %v", err)
+		logger.Fatal("server failed", zap.Error(err))
 	}
 }
 
@@ -133,10 +139,37 @@ func resolveLiteLLMRuntimeConfig() liteLLMRuntimeConfig {
 	}
 }
 
-func buildLiteLLMClient(cfg liteLLMRuntimeConfig) *litellm.Client {
+func mustNewLogger(cfg logging.Config) *zap.Logger {
+	logger, err := logging.New(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
+func buildRuntimeLogger(fallback *zap.Logger) *zap.Logger {
+	cfg := logging.Config{
+		Level:  strings.TrimSpace(os.Getenv("LOG_LEVEL")),
+		Format: strings.TrimSpace(envOr("LOG_FORMAT", "json")),
+	}
+	logger, err := logging.New(cfg)
+	if err != nil {
+		fallback.Warn(
+			"init runtime logger failed, fallback to json/info",
+			zap.Error(err),
+			zap.String("log_level", cfg.Level),
+			zap.String("log_format", cfg.Format),
+		)
+		logger = mustNewLogger(logging.Config{Level: "info", Format: "json"})
+	}
+	logger.Info("logger initialized", zap.String("log_level", envOr("LOG_LEVEL", "info")), zap.String("log_format", envOr("LOG_FORMAT", "json")))
+	return logger
+}
+
+func buildLiteLLMClient(cfg liteLLMRuntimeConfig, logger *zap.Logger) *litellm.Client {
 	masterKey := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY"))
 	if masterKey == "" {
-		log.Printf("litellm integration disabled: missing LITELLM_MASTER_KEY")
+		logger.Info("litellm integration disabled", zap.String("reason", "missing LITELLM_MASTER_KEY"))
 		return nil
 	}
 
@@ -144,38 +177,38 @@ func buildLiteLLMClient(cfg liteLLMRuntimeConfig) *litellm.Client {
 		BaseURL:   cfg.BaseURL,
 		MasterKey: masterKey,
 		HTTPClient: &http.Client{
-			Timeout: parseDurationOr("LITELLM_HTTP_TIMEOUT", 5*time.Second),
+			Timeout: parseDurationOr(logger, "LITELLM_HTTP_TIMEOUT", 5*time.Second),
 		},
 	})
 	if err != nil {
-		log.Printf("litellm integration disabled: create client failed: %v", err)
+		logger.Warn("litellm integration disabled: create client failed", zap.Error(err))
 		return nil
 	}
-	log.Printf("litellm integration enabled")
+	logger.Info("litellm integration enabled", zap.String("base_url", cfg.BaseURL))
 	return client
 }
 
-func buildLiteLLMCreditService(db *gorm.DB, client *litellm.Client) *litellmcredit.Service {
+func buildLiteLLMCreditService(db *gorm.DB, client *litellm.Client, logger *zap.Logger) *litellmcredit.Service {
 	if client == nil {
-		log.Printf("litellm credit service disabled: litellm client is unavailable")
+		logger.Info("litellm credit service disabled", zap.String("reason", "litellm client unavailable"))
 		return nil
 	}
 
 	service, err := litellmcredit.NewService(db, client, litellmcredit.Config{
 		PlatformAdminEmails: litellmcredit.ParsePlatformAdminEmails(os.Getenv("PLATFORM_ADMIN_EMAILS")),
-		DefaultUserQuota:    parseFloatOr("LITELLM_DEFAULT_USER_QUOTA", 10),
+		DefaultUserQuota:    parseFloatOr(logger, "LITELLM_DEFAULT_USER_QUOTA", 10),
 	})
 	if err != nil {
-		log.Printf("litellm credit service disabled: create service failed: %v", err)
+		logger.Warn("litellm credit service disabled: create service failed", zap.Error(err))
 		return nil
 	}
-	log.Printf("litellm credit service enabled")
+	logger.Info("litellm credit service enabled")
 	return service
 }
 
-func loadDotenvFiles() {
+func loadDotenvFiles(logger *zap.Logger) {
 	files := dotenvFiles()
-	log.Printf("dotenv load start: files=%s", strings.Join(files, ","))
+	logger.Info("dotenv load start", zap.Strings("files", files))
 
 	totalSet := 0
 	totalSkipped := 0
@@ -183,10 +216,10 @@ func loadDotenvFiles() {
 		values, err := godotenv.Read(file)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				log.Printf("dotenv file missing: %s (skipped)", file)
+				logger.Debug("dotenv file missing", zap.String("file", file))
 				continue
 			}
-			log.Printf("dotenv read failed: file=%s err=%v (skipped)", file, err)
+			logger.Warn("dotenv read failed", zap.String("file", file), zap.Error(err))
 			continue
 		}
 
@@ -200,7 +233,7 @@ func loadDotenvFiles() {
 				continue
 			}
 			if err := os.Setenv(key, value); err != nil {
-				log.Printf("dotenv set failed: file=%s key=%s err=%v", file, key, err)
+				logger.Warn("dotenv set failed", zap.String("file", file), zap.String("key", key), zap.Error(err))
 				continue
 			}
 			setCount++
@@ -209,17 +242,17 @@ func loadDotenvFiles() {
 		sort.Strings(keys)
 		totalSet += setCount
 		totalSkipped += skippedCount
-		log.Printf(
-			"dotenv loaded: file=%s parsed=%d set=%d skipped=%d keys=%s",
-			file,
-			len(values),
-			setCount,
-			skippedCount,
-			strings.Join(keys, ","),
+		logger.Info(
+			"dotenv loaded",
+			zap.String("file", file),
+			zap.Int("parsed", len(values)),
+			zap.Int("set", setCount),
+			zap.Int("skipped", skippedCount),
+			zap.Strings("keys", keys),
 		)
 	}
 
-	log.Printf("dotenv load done: set=%d skipped=%d", totalSet, totalSkipped)
+	logger.Info("dotenv load done", zap.Int("set", totalSet), zap.Int("skipped", totalSkipped))
 }
 
 func dotenvFiles() []string {
@@ -254,63 +287,76 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func parseDurationOr(key string, fallback time.Duration) time.Duration {
+func parseDurationOr(logger *zap.Logger, key string, fallback time.Duration) time.Duration {
 	raw := os.Getenv(key)
 	if raw == "" {
 		return fallback
 	}
 	parsed, err := time.ParseDuration(raw)
 	if err != nil {
-		log.Printf("invalid duration for %s=%s, fallback=%s", key, raw, fallback)
+		logger.Warn("invalid duration, using fallback", zap.String("key", key), zap.String("raw", raw), zap.Duration("fallback", fallback))
 		return fallback
 	}
 	return parsed
 }
 
-func parseIntOr(key string, fallback int) int {
+func parseIntOr(logger *zap.Logger, key string, fallback int) int {
 	raw := os.Getenv(key)
 	if raw == "" {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(raw)
 	if err != nil {
-		log.Printf("invalid int for %s=%s, fallback=%d", key, raw, fallback)
+		logger.Warn("invalid int, using fallback", zap.String("key", key), zap.String("raw", raw), zap.Int("fallback", fallback))
 		return fallback
 	}
 	return parsed
 }
 
-func parseFloatOr(key string, fallback float64) float64 {
+func parseBoolOr(logger *zap.Logger, key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		logger.Warn("invalid bool, using fallback", zap.String("key", key), zap.String("raw", raw), zap.Bool("fallback", fallback))
+		return fallback
+	}
+	return parsed
+}
+
+func parseFloatOr(logger *zap.Logger, key string, fallback float64) float64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
 		return fallback
 	}
 	parsed, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
-		log.Printf("invalid float for %s=%s, fallback=%f", key, raw, fallback)
+		logger.Warn("invalid float, using fallback", zap.String("key", key), zap.String("raw", raw), zap.Float64("fallback", fallback))
 		return fallback
 	}
 	return parsed
 }
 
-func selectAuthzProvider() authz.Provider {
+func selectAuthzProvider(logger *zap.Logger) authz.Provider {
 	switch envOr("AUTHZ_PROVIDER", "memory") {
 	case "openfga":
 		apiURL := envOr("OPENFGA_API_URL", "http://localhost:8081")
 		storeID := os.Getenv("OPENFGA_STORE_ID")
 		if storeID == "" {
-			log.Printf("AUTHZ_PROVIDER=openfga but OPENFGA_STORE_ID is empty, fallback to memory")
+			logger.Warn("AUTHZ_PROVIDER=openfga but OPENFGA_STORE_ID is empty, fallback to memory")
 			return authzmem.NewProvider()
 		}
-		log.Printf("using OpenFGA authz provider: api_url=%s store_id=%s", apiURL, storeID)
+		logger.Info("using OpenFGA authz provider", zap.String("api_url", apiURL), zap.String("store_id", storeID))
 		return authzopenfga.NewProvider(apiURL, storeID)
 	default:
-		log.Printf("using in-memory authz provider")
+		logger.Info("using in-memory authz provider")
 		return authzmem.NewProvider()
 	}
 }
 
-func selectSMSProvider() authn.SMSProvider {
+func selectSMSProvider(logger *zap.Logger) authn.SMSProvider {
 	switch envOr("SMS_PROVIDER", "log") {
 	case "aliyun":
 		provider, err := smsaliyun.NewProvider(smsaliyun.Config{
@@ -319,15 +365,15 @@ func selectSMSProvider() authn.SMSProvider {
 			AccessKeySecret:      os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
 			SignName:             os.Getenv("ALIYUN_SMS_SIGN_NAME"),
 			RegisterTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_REGISTER"),
-		})
+		}, logger)
 		if err != nil {
-			log.Printf("init aliyun sms provider failed: %v, fallback to log provider", err)
-			return authn.NewLogSMSProvider()
+			logger.Warn("init aliyun sms provider failed, fallback to log provider", zap.Error(err))
+			return authn.NewLogSMSProvider(logger)
 		}
-		log.Printf("using aliyun sms provider")
+		logger.Info("using aliyun sms provider")
 		return provider
 	default:
-		log.Printf("using log sms provider")
-		return authn.NewLogSMSProvider()
+		logger.Info("using log sms provider")
+		return authn.NewLogSMSProvider(logger)
 	}
 }

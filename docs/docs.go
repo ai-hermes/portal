@@ -1199,6 +1199,44 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.allowedResponse": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "api.apiErrorBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.apiErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/api.apiErrorBody"
+                }
+            }
+        },
+        "api.auditEventsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AuditEvent"
+                    }
+                }
+            }
+        },
         "api.changePasswordRequest": {
             "type": "object",
             "properties": {
@@ -1224,11 +1262,30 @@ const docTemplate = `{
                 }
             }
         },
+        "api.errorMessageResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
         "api.forgotPasswordRequest": {
             "type": "object",
             "properties": {
                 "email": {
                     "type": "string"
+                }
+            }
+        },
+        "api.liteLLMAccessResponse": {
+            "type": "object",
+            "properties": {
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "service_available": {
+                    "type": "boolean"
                 }
             }
         },
@@ -1252,6 +1309,37 @@ const docTemplate = `{
                 }
             }
         },
+        "api.liteLLMEventsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/litellmcredit.CreditEvent"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.liteLLMRecentCallsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/litellmcredit.RecentCall"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                }
+            }
+        },
         "api.loginRequest": {
             "type": "object",
             "properties": {
@@ -1263,6 +1351,14 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                }
+            }
+        },
+        "api.okResponse": {
+            "type": "object",
+            "properties": {
+                "ok": {
+                    "type": "boolean"
                 }
             }
         },
@@ -1323,6 +1419,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "purpose": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.statusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
                     "type": "string"
                 }
             }
@@ -1483,6 +1587,25 @@ const docTemplate = `{
                 }
             }
         },
+        "api.tenantMembersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/identity.Principal"
+                    }
+                }
+            }
+        },
+        "api.verifiedResponse": {
+            "type": "object",
+            "properties": {
+                "verified": {
+                    "type": "boolean"
+                }
+            }
+        },
         "api.verifyEmailRequest": {
             "type": "object",
             "properties": {
@@ -1502,6 +1625,14 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.PolicyTuple"
                     }
+                }
+            }
+        },
+        "api.writtenResponse": {
+            "type": "object",
+            "properties": {
+                "written": {
+                    "type": "integer"
                 }
             }
         },
@@ -1725,7 +1856,6 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Use JWT bearer token: ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -1739,8 +1869,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "",
 	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "Portal API",
-	Description:      "API documentation for the Portal backend.",
+	Title:            "AI-Hermes Portal API",
+	Description:      "AI-Hermes Portal backend APIs.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

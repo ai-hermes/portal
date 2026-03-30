@@ -1,8 +1,6 @@
 name: tencent-cvm-deploy
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -19,6 +17,8 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    # Temporarily disabled: keep workflow definition for future re-enable.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     env:
       ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
@@ -102,9 +102,11 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+          SWAGGER_ENABLED: ${{ vars.SWAGGER_ENABLED }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_MASTER_KEY: ${{ secrets.LITELLM_MASTER_KEY }}
           OPENFGA_STORE_ID: ${{ secrets.OPENFGA_STORE_ID }}
+          SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
           ALIBABA_CLOUD_REGION_ID: ${{ secrets.ALIBABA_CLOUD_REGION_ID }}
           ALIBABA_CLOUD_ACCESS_KEY_ID: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_ID }}
           ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY_SECRET }}
@@ -114,6 +116,22 @@ jobs:
         run: |
           SSH_PORT="${{ secrets.CVM_PORT }}"
           if [ -z "$SSH_PORT" ]; then SSH_PORT=22; fi
+
+          export ACCESS_TOKEN_TTL="${ACCESS_TOKEN_TTL:-15m}"
+          export REFRESH_TOKEN_TTL="${REFRESH_TOKEN_TTL:-720h}"
+          export EMAIL_CODE_TTL="${EMAIL_CODE_TTL:-10m}"
+          export SMS_CODE_TTL="${SMS_CODE_TTL:-10m}"
+          export SMS_RATE_WINDOW="${SMS_RATE_WINDOW:-10m}"
+          export SMS_RESEND_INTERVAL="${SMS_RESEND_INTERVAL:-60s}"
+          export SMS_MAX_PER_PHONE="${SMS_MAX_PER_PHONE:-5}"
+          export SMS_MAX_PER_IP="${SMS_MAX_PER_IP:-20}"
+          export PASSWORD_RESET_TTL="${PASSWORD_RESET_TTL:-15m}"
+          export SWAGGER_ENABLED="${SWAGGER_ENABLED:-true}"
+          export LITELLM_HTTP_TIMEOUT="${LITELLM_HTTP_TIMEOUT:-5s}"
+          export LITELLM_DEFAULT_USER_QUOTA="${LITELLM_DEFAULT_USER_QUOTA:-10}"
+          export AUTHZ_PROVIDER="${AUTHZ_PROVIDER:-openfga}"
+          export OPENFGA_API_URL="${OPENFGA_API_URL:-http://openfga:8080}"
+          export SMS_PROVIDER="${SMS_PROVIDER:-aliyun}"
 
           # Render .env locally from template, then push to CVM
           envsubst < deploy/ecs/.env.tmpl > /tmp/.env.rendered

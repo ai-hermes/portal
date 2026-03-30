@@ -1,5 +1,29 @@
 basePath: /
 definitions:
+  api.allowedResponse:
+    properties:
+      allowed:
+        type: boolean
+    type: object
+  api.apiErrorBody:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  api.apiErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/api.apiErrorBody'
+    type: object
+  api.auditEventsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.AuditEvent'
+        type: array
+    type: object
   api.changePasswordRequest:
     properties:
       new_password:
@@ -16,10 +40,22 @@ definitions:
       subject:
         type: string
     type: object
+  api.errorMessageResponse:
+    properties:
+      error:
+        type: string
+    type: object
   api.forgotPasswordRequest:
     properties:
       email:
         type: string
+    type: object
+  api.liteLLMAccessResponse:
+    properties:
+      can_manage:
+        type: boolean
+      service_available:
+        type: boolean
     type: object
   api.liteLLMCreditAdjustRequest:
     properties:
@@ -34,6 +70,26 @@ definitions:
       user_id:
         type: string
     type: object
+  api.liteLLMEventsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.CreditEvent'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+    type: object
+  api.liteLLMRecentCallsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/litellmcredit.RecentCall'
+        type: array
+      limit:
+        type: integer
+    type: object
   api.loginRequest:
     properties:
       account:
@@ -42,6 +98,11 @@ definitions:
         type: string
       password:
         type: string
+    type: object
+  api.okResponse:
+    properties:
+      ok:
+        type: boolean
     type: object
   api.refreshRequest:
     properties:
@@ -80,6 +141,11 @@ definitions:
       phone:
         type: string
       purpose:
+        type: string
+    type: object
+  api.statusResponse:
+    properties:
+      status:
         type: string
     type: object
   api.swaggerAPIErrorResponse:
@@ -181,6 +247,18 @@ definitions:
       written:
         type: integer
     type: object
+  api.tenantMembersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/identity.Principal'
+        type: array
+    type: object
+  api.verifiedResponse:
+    properties:
+      verified:
+        type: boolean
+    type: object
   api.verifyEmailRequest:
     properties:
       code:
@@ -194,6 +272,11 @@ definitions:
         items:
           $ref: '#/definitions/models.PolicyTuple'
         type: array
+    type: object
+  api.writtenResponse:
+    properties:
+      written:
+        type: integer
     type: object
   authn.RegisterResult:
     properties:
@@ -339,8 +422,8 @@ definitions:
     type: object
 info:
   contact: {}
-  description: API documentation for the Portal backend.
-  title: Portal API
+  description: AI-Hermes Portal backend APIs.
+  title: AI-Hermes Portal API
   version: "1.0"
 paths:
   /api/v1/admin/litellm/access:
@@ -1093,7 +1176,6 @@ paths:
       - system
 securityDefinitions:
   BearerAuth:
-    description: 'Use JWT bearer token: `Bearer <token>`.'
     in: header
     name: Authorization
     type: apiKey
