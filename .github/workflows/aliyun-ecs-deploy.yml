@@ -35,6 +35,9 @@ jobs:
           set -euo pipefail
           test -n "${ACR_REGISTRY}" || (echo "ALIYUN_ACR_REGISTRY is required" && exit 1)
           test -n "${ACR_NAMESPACE}" || (echo "ALIYUN_ACR_NAMESPACE is required" && exit 1)
+          test -n "${{ secrets.ECS_HOST }}" || (echo "ECS_HOST is required" && exit 1)
+          test -n "${{ secrets.ECS_USER }}" || (echo "ECS_USER is required" && exit 1)
+          test -n "${{ secrets.ECS_DEPLOY_PATH }}" || (echo "ECS_DEPLOY_PATH is required" && exit 1)
 
       - name: Compute image tag
         id: vars
