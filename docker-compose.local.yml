@@ -40,10 +40,11 @@ services:
       openfga-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "/openfga", "version"]
       interval: 10s
       timeout: 3s
       retries: 10
+      start_period: 15s
 
   openfga-init:
     image: "${IMAGE_REGISTRY:-docker.io}/curlimages/curl:8.8.0"
