@@ -1,8 +1,6 @@
 name: tencent-cvm-deploy
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -19,6 +17,8 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    # Temporarily disabled: keep workflow definition for future re-enable.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     env:
       ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
