@@ -89,6 +89,7 @@ jobs:
           scp -P "$SSH_PORT" -o StrictHostKeyChecking=no \
             deploy/ecs/docker-compose.prod.yml \
             deploy/ecs/.env.tmpl \
+            deploy/ecs/init-postgres.sh \
             "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}:${{ secrets.CVM_DEPLOY_PATH }}/"
           ssh -p "$SSH_PORT" -o StrictHostKeyChecking=no "${{ secrets.CVM_USER }}@${{ secrets.CVM_HOST }}" \
             "mv '${{ secrets.CVM_DEPLOY_PATH }}/docker-compose.prod.yml' '${{ secrets.CVM_DEPLOY_PATH }}/docker-compose.yml'"
@@ -101,6 +102,7 @@ jobs:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENFGA_DATASTORE_URI: ${{ secrets.OPENFGA_DATASTORE_URI }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_MASTER_KEY: ${{ secrets.LITELLM_MASTER_KEY }}

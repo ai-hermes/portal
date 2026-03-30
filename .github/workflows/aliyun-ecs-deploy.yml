@@ -84,6 +84,7 @@ jobs:
           scp -P "$SCP_PORT" -o StrictHostKeyChecking=no \
             deploy/ecs/docker-compose.prod.yml \
             deploy/ecs/.env.tmpl \
+            deploy/ecs/init-postgres.sh \
             "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:${{ secrets.ECS_DEPLOY_PATH }}/"
           ssh -p "$SCP_PORT" -o StrictHostKeyChecking=no "${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}" \
             "mv '${{ secrets.ECS_DEPLOY_PATH }}/docker-compose.prod.yml' '${{ secrets.ECS_DEPLOY_PATH }}/docker-compose.yml'"
@@ -96,6 +97,7 @@ jobs:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENFGA_DATASTORE_URI: ${{ secrets.OPENFGA_DATASTORE_URI }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
           LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
           LITELLM_MASTER_KEY: ${{ secrets.LITELLM_MASTER_KEY }}
