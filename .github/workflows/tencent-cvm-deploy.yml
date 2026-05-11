@@ -40,6 +40,7 @@ jobs:
           test -n "${{ secrets.CVM_HOST }}" || (echo "CVM_HOST is required" && exit 1)
           test -n "${{ secrets.CVM_USER }}" || (echo "CVM_USER is required" && exit 1)
           test -n "${{ secrets.CVM_DEPLOY_PATH }}" || (echo "CVM_DEPLOY_PATH is required" && exit 1)
+          test -n "${{ secrets.ALIYUN_SMS_TEMPLATE_CODE_PASSWORD_RESET }}" || (echo "ALIYUN_SMS_TEMPLATE_CODE_PASSWORD_RESET is required" && exit 1)
 
       - name: Compute image tag
         id: vars
