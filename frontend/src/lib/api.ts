@@ -184,6 +184,13 @@ export async function sendRegisterSMSCode(phone: string) {
   });
 }
 
+export async function sendPasswordResetSMSCode(phone: string) {
+  return apiFetch<{ ok: boolean }>(`${apiBaseURL}/api/v1/auth/sms/send-code`, {
+    method: "POST",
+    body: JSON.stringify({ phone, purpose: "reset_password" })
+  });
+}
+
 export async function registerByPhone(input: { phone: string; code: string; password: string; display_name?: string }) {
   return apiFetch<{ user_id: string; tenant_id: string }>(`${apiBaseURL}/api/v1/auth/register/phone`, {
     method: "POST",
@@ -213,6 +220,13 @@ export async function resetPassword(token: string, newPassword: string) {
   return apiFetch<{ ok: boolean }>(`${apiBaseURL}/api/v1/auth/password/reset`, {
     method: "POST",
     body: JSON.stringify({ token, new_password: newPassword })
+  });
+}
+
+export async function resetPasswordByPhone(phone: string, code: string, newPassword: string) {
+  return apiFetch<{ ok: boolean }>(`${apiBaseURL}/api/v1/auth/password/reset/phone`, {
+    method: "POST",
+    body: JSON.stringify({ phone, code, new_password: newPassword })
   });
 }
 
