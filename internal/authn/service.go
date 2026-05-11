@@ -88,6 +88,7 @@ type EmailProvider interface {
 
 type SMSProvider interface {
 	SendRegisterCode(ctx context.Context, phone, code string) error
+	SendPasswordResetCode(ctx context.Context, phone, code string) error
 }
 
 type UserProvisioner interface {
@@ -261,6 +262,17 @@ type RegisterPhoneInput struct {
 	DisplayName string
 }
 
+type ResetPasswordByPhoneInput struct {
+	Phone       string
+	Code        string
+	NewPassword string
+}
+
+const (
+	smsPurposeRegister      = "register"
+	smsPurposePasswordReset = "reset_password"
+)
+
 func (s *Service) Register(ctx context.Context, in RegisterInput, remoteAddr, userAgent string) (RegisterResult, error) {
 	email := strings.ToLower(strings.TrimSpace(in.Email))
 	s.authLog.Info("register attempt", zap.String("email", email), zap.String("remote_addr", remoteAddr), zap.String("user_agent", userAgent))
@@ -362,9 +374,9 @@ func (s *Service) SendSMSCode(ctx context.Context, in SendSMSCodeInput, remoteAd
 	}
 	in.Purpose = strings.TrimSpace(in.Purpose)
 	if in.Purpose == "" {
-		in.Purpose = "register"
+		in.Purpose = smsPurposeRegister
 	}
-	if in.Purpose != "register" {
+	if in.Purpose != smsPurposeRegister && in.Purpose != smsPurposePasswordReset {
 		s.authLog.Warn("send sms code invalid purpose", zap.String("phone", phone), zap.String("purpose", in.Purpose))
 		return apiError(400, "invalid_purpose", "unsupported sms purpose")
 	}
@@ -417,6 +429,22 @@ func (s *Service) SendSMSCode(ctx context.Context, in SendSMSCodeInput, remoteAd
 		return apiError(429, "too_many_requests", "sms code requested too frequently")
 	}
 
+	if in.Purpose == smsPurposePasswordReset {
+		var existing userModel
+		err = s.db.WithContext(ctx).
+			Select("id").
+			Where("phone = ? AND phone_verified_at IS NOT NULL", phone).
+			Take(&existing).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				s.authLog.Info("send password reset sms denied, phone not registered", zap.String("phone", phone))
+				return apiError(404, "phone_not_registered", "手机号未注册，请先注册")
+			}
+			s.authLog.Error("query password reset phone failed", zap.String("phone", phone), zap.Error(err))
+			return err
+		}
+	}
+
 	code := randomDigits(6)
 	verificationID := "sv_" + randomID(12)
 	now := time.Now().UTC()
@@ -434,9 +462,16 @@ func (s *Service) SendSMSCode(ctx context.Context, in SendSMSCodeInput, remoteAd
 		return err
 	}
 
-	if err := s.sms.SendRegisterCode(ctx, phone, code); err != nil {
+	var sendErr error
+	switch in.Purpose {
+	case smsPurposePasswordReset:
+		sendErr = s.sms.SendPasswordResetCode(ctx, phone, code)
+	default:
+		sendErr = s.sms.SendRegisterCode(ctx, phone, code)
+	}
+	if sendErr != nil {
 		_ = s.db.WithContext(ctx).Delete(&smsVerificationModel{}, "id = ?", verificationID).Error
-		s.authLog.Warn("send sms verification code failed", zap.String("phone", phone), zap.String("purpose", in.Purpose), zap.String("code", code), zap.Error(err))
+		s.authLog.Warn("send sms verification code failed", zap.String("phone", phone), zap.String("purpose", in.Purpose), zap.String("code", code), zap.Error(sendErr))
 		return apiError(500, "sms_send_failed", "failed to send sms verification code")
 	}
 	s.authLog.Info("send sms code success", zap.String("phone", phone), zap.String("purpose", in.Purpose), zap.String("code", code), zap.String("verification_id", verificationID))
@@ -471,7 +506,7 @@ func (s *Service) RegisterByPhone(ctx context.Context, in RegisterPhoneInput, re
 
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&smsVerificationModel{}).
-			Where("phone = ? AND purpose = ? AND code_hash = ? AND used_at IS NULL AND expires_at > ?", phone, "register", hashToken(strings.TrimSpace(in.Code)), now).
+			Where("phone = ? AND purpose = ? AND code_hash = ? AND used_at IS NULL AND expires_at > ?", phone, smsPurposeRegister, hashToken(strings.TrimSpace(in.Code)), now).
 			Update("used_at", now)
 		if result.Error != nil {
 			return result.Error
@@ -830,6 +865,57 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 		}
 		return tx.Model(&refreshTokenModel{}).
 			Where("user_id = ? AND revoked_at IS NULL", reset.UserID).
+			Update("revoked_at", now).Error
+	})
+}
+
+func (s *Service) ResetPasswordByPhone(ctx context.Context, in ResetPasswordByPhoneInput) error {
+	phone := strings.TrimSpace(in.Phone)
+	code := strings.TrimSpace(in.Code)
+	if err := validateCNPhone(phone); err != nil {
+		return apiError(400, "invalid_phone", err.Error())
+	}
+	if code == "" || strings.TrimSpace(in.NewPassword) == "" {
+		return apiError(400, "invalid_request", "phone, code and new_password are required")
+	}
+	if err := validatePassword(in.NewPassword); err != nil {
+		return apiError(400, "weak_password", err.Error())
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+
+		var user userModel
+		if err := tx.Select("id").
+			Where("phone = ? AND phone_verified_at IS NOT NULL", phone).
+			Take(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apiError(404, "phone_not_registered", "手机号未注册，请先注册")
+			}
+			return err
+		}
+
+		result := tx.Model(&smsVerificationModel{}).
+			Where("phone = ? AND purpose = ? AND code_hash = ? AND used_at IS NULL AND expires_at > ?", phone, smsPurposePasswordReset, hashToken(code), now).
+			Update("used_at", now)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return apiError(400, "invalid_verification_code", "invalid verification code")
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(in.NewPassword), s.cfg.BcryptCost)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&userModel{}).
+			Where("id = ?", user.ID).
+			Updates(map[string]any{"password_hash": string(hash), "updated_at": now}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&refreshTokenModel{}).
+			Where("user_id = ? AND revoked_at IS NULL", user.ID).
 			Update("revoked_at", now).Error
 	})
 }

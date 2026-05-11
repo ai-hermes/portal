@@ -87,6 +87,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	auth.POST("/logout", r.handleLogout)
 	auth.POST("/password/forgot", r.handleForgotPassword)
 	auth.POST("/password/reset", r.handleResetPassword)
+	auth.POST("/password/reset/phone", r.handleResetPasswordByPhone)
 	auth.POST("/password/change", r.withAuth(), r.handleChangePassword)
 	engine.GET("/api/v1/config/litellm", r.handleLiteLLMConfig)
 
@@ -420,6 +421,41 @@ func (r *Router) handleResetPassword(c *gin.Context) {
 	}
 
 	if err := r.deps.Authn.ResetPassword(c.Request.Context(), body.Token, body.NewPassword); err != nil {
+		r.writeAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]bool{"ok": true})
+}
+
+type resetPasswordByPhoneRequest struct {
+	Phone       string `json:"phone"`
+	Code        string `json:"code"`
+	NewPassword string `json:"new_password"`
+}
+
+// handleResetPasswordByPhone godoc
+// @Summary Reset password by phone
+// @Description Resets password with a phone SMS verification code.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body resetPasswordByPhoneRequest true "Reset password by phone payload"
+// @Success 200 {object} okResponse
+// @Failure 400 {object} errorMessageResponse
+// @Failure 500 {object} apiErrorResponse
+// @Router /api/v1/auth/password/reset/phone [post]
+func (r *Router) handleResetPasswordByPhone(c *gin.Context) {
+	var body resetPasswordByPhoneRequest
+	if err := decodeJSON(c, &body); err != nil {
+		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if err := r.deps.Authn.ResetPasswordByPhone(c.Request.Context(), authn.ResetPasswordByPhoneInput{
+		Phone:       body.Phone,
+		Code:        body.Code,
+		NewPassword: body.NewPassword,
+	}); err != nil {
 		r.writeAuthError(c, err)
 		return
 	}

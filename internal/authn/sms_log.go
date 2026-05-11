@@ -21,3 +21,8 @@ func (p *LogSMSProvider) SendRegisterCode(_ context.Context, phone, code string)
 	p.logger.Info("send register sms code", zap.String("phone", phone), zap.String("code", code))
 	return nil
 }
+
+func (p *LogSMSProvider) SendPasswordResetCode(_ context.Context, phone, code string) error {
+	p.logger.Info("send password reset sms code", zap.String("phone", phone), zap.String("code", code))
+	return nil
+}
