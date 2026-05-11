@@ -360,11 +360,12 @@ func selectSMSProvider(logger *zap.Logger) authn.SMSProvider {
 	switch envOr("SMS_PROVIDER", "log") {
 	case "aliyun":
 		provider, err := smsaliyun.NewProvider(smsaliyun.Config{
-			RegionID:             envOr("ALIBABA_CLOUD_REGION_ID", "cn-hangzhou"),
-			AccessKeyID:          os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"),
-			AccessKeySecret:      os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
-			SignName:             os.Getenv("ALIYUN_SMS_SIGN_NAME"),
-			RegisterTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_REGISTER"),
+			RegionID:                  envOr("ALIBABA_CLOUD_REGION_ID", "cn-hangzhou"),
+			AccessKeyID:               os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_ID"),
+			AccessKeySecret:           os.Getenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET"),
+			SignName:                  os.Getenv("ALIYUN_SMS_SIGN_NAME"),
+			RegisterTemplateCode:      os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_REGISTER"),
+			PasswordResetTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE_PASSWORD_RESET"),
 		}, logger)
 		if err != nil {
 			logger.Warn("init aliyun sms provider failed, fallback to log provider", zap.Error(err))

@@ -193,6 +193,7 @@ Swagger UI: `http://localhost:8080/swagger/index.html`
 - `ALIBABA_CLOUD_ACCESS_KEY_SECRET` required when `SMS_PROVIDER=aliyun`
 - `ALIYUN_SMS_SIGN_NAME` required when `SMS_PROVIDER=aliyun`
 - `ALIYUN_SMS_TEMPLATE_CODE_REGISTER` required when `SMS_PROVIDER=aliyun`
+- `ALIYUN_SMS_TEMPLATE_CODE_PASSWORD_RESET` required when `SMS_PROVIDER=aliyun`
 - `AUTHZ_PROVIDER` default `memory` (`openfga` to enable OpenFGA provider)
 - `OPENFGA_API_URL` default `http://localhost:8081` for non-compose local runs
 - `OPENFGA_STORE_ID` required when `AUTHZ_PROVIDER=openfga`
