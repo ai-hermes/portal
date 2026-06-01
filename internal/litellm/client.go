@@ -226,10 +226,20 @@ func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
 		"/models",
 		"/model/info",
 	}
+	cacheBuster := fmt.Sprintf("%d", time.Now().UnixNano())
 	var lastErr error
 	sawNotFound := false
 	for _, path := range candidates {
-		data, err := c.doJSON(ctx, http.MethodGet, path, nil)
+		u, err := url.Parse(path)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		q := u.Query()
+		q.Set("t", cacheBuster)
+		u.RawQuery = q.Encode()
+		requestPath := u.String()
+		data, err := c.doJSON(ctx, http.MethodGet, requestPath, nil)
 		if err != nil {
 			if isNotFoundError(err) {
 				sawNotFound = true
