@@ -230,12 +230,15 @@ func (c *Client) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	var lastErr error
 	sawNotFound := false
 	for _, path := range candidates {
-		requestPath := path
-		if strings.Contains(requestPath, "?") {
-			requestPath += "&t=" + url.QueryEscape(cacheBuster)
-		} else {
-			requestPath += "?t=" + url.QueryEscape(cacheBuster)
+		u, err := url.Parse(path)
+		if err != nil {
+			lastErr = err
+			continue
 		}
+		q := u.Query()
+		q.Set("t", cacheBuster)
+		u.RawQuery = q.Encode()
+		requestPath := u.String()
 		data, err := c.doJSON(ctx, http.MethodGet, requestPath, nil)
 		if err != nil {
 			if isNotFoundError(err) {
